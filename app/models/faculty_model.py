@@ -5,7 +5,7 @@ from sqlalchemy import (
     String,
     DateTime
 )
-from app.db.session import Base
+from app.db.database import Base
 
 class Faculty(Base):
     __tablename__ = "faculty"

@@ -5,7 +5,7 @@ from sqlalchemy import (
     String,
     DateTime
 )
-from app.db.session import Base
+from app.db.database import Base
 
 class Cafedra(Base):
     __tablename__ = "cafedras"
@@ -17,5 +17,5 @@ class Cafedra(Base):
     id = Column(Integer, primary_key=True, index=True)
     faculty_code = Column(String, nullable=False)
     cafedra_code = Column(String, nullable=False, unique=True)
-    cafedra_name = Column(String, nullable=False, unique=True)
+    cafedra_name = Column(String, nullable=False)
     created_at = Column(DateTime, nullable=False)

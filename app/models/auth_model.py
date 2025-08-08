@@ -6,7 +6,7 @@ from sqlalchemy import (
     Boolean,
     DateTime
 )
-from app.db.session import Base
+from app.db.database import Base
 
 class Auth(Base):
     __tablename__ = "auth"
@@ -19,3 +19,4 @@ class Auth(Base):
     approved = Column(Boolean, nullable=False, default=False)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=True)
+    otp = Column(Integer)

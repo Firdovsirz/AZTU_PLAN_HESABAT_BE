@@ -1,4 +1,3 @@
-from app.db.session import Base
 from sqlalchemy import (
     UniqueConstraint,
     Column,
@@ -6,6 +5,7 @@ from sqlalchemy import (
     String,
     DateTime,
 )
+from app.db.database import Base
 
 class Plan(Base):
     __tablename__ = "work_plan"

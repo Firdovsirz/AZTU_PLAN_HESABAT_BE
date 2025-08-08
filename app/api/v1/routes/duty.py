@@ -8,19 +8,26 @@ from fastapi import APIRouter, Depends, Query
 router = APIRouter()
 
 @router.post("/add-duty")
-def add_duty_endpoint(
+async def add_duty_endpoint(
     duty_name: str = Query(..., description="Name of the duty"),
     db: Session = Depends(get_db)
 ):
-    return create_duty(duty_name, db)
+    return await create_duty(duty_name, db)
 
 @router.get("/duties")
-def get_duties_endpoint(db: Session = Depends(get_db)):
-    return get_duties(db)
+async def get_duties_endpoint(db: Session = Depends(get_db)):
+    return await get_duties(db)
 
 @router.get("/duty/{duty_code}")
-def get_duty_by_code_endpoint(
+async def get_duty_by_code_endpoint(
     duty_code: Annotated[str, Path(..., description="Duty Code")],
     db: Session = Depends(get_db)
 ):
-    return get_duty_by_code(duty_code, db)
+    return await get_duty_by_code(duty_code, db)
+
+@router.delete("/delete/duty/{duty_code}")
+async def delete_duty_endpoint(
+    duty_code: Annotated[int, Path(..., description="Duty Code")],
+    db: Session = Depends(get_db)
+):
+    return await delete_duty(duty_code, db)

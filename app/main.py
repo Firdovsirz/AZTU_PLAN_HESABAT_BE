@@ -1,23 +1,30 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI
-from app.api.v1 import auth
-from app.api.v1 import duty
-from app.api.v1 import plan
-from app.api.v1 import user
-from app.api.v1 import faculty
-from app.api.v1 import cafedra
-from app.api.v1 import hesabat
-from app.api.v1 import activity
-from app.api.v1 import assessment
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
-from fastapi.staticfiles import StaticFiles
-
+from app.api.v1.routes import (
+    auth,
+    duty,
+    plan,
+    user,
+    faculty,
+    cafedra,
+    hesabat,
+    activity,
+    assessment
+)
 
 app = FastAPI(
     title="AZTU Plan Hesabat API",
     version="1.0.0",
     description="Backend for AZTU Plan Hesabat system."
 )
+
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

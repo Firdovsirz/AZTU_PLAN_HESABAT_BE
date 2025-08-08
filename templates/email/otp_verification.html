@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Welcome Email</title>
+    <title>OTP Verification</title>
 </head>
 
 <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
@@ -14,15 +14,18 @@
                 alt="AzTU">
         </div>
         <h2 style="color: #333333;">Salam, {{ name }}!</h2>
-        <p style="color: #666666;">Sistemə etdiyiniz qeydiyyatdan müraciəti uğurla təsdiləndi. Xoş gəlmisiniz!</p>
-        <div style="width: 100%; display: flex; justify-content: center; align-items: center;">
-            <button
-                style="background-color: #007BFF; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">
-                <a href="http://localhost:5173" style="color: white; text-decoration: none;">
-                    Daxil ol
-                </a>
-            </button>
-        </div>
+        <p style="color: #666666;">
+            Bu, sizin 1 dəfəlik istifadə üçün göndərilən OTP təsdiqləmə kodunuzdur:
+        </p>
+        <h1 style="text-align: center; letter-spacing: 5px; font-size: 24px; color: #333333; margin: 20px 0;">
+            {{ otp_code }}
+        </h1>
+        <p style="color: #666666;">
+            Bu kod yalnız 5 dəqiqə ərzində etibarlıdır. Zəhmət olmasa, kodu vaxtında daxil edin.
+        </p>
+        <p style="color: #666666;">
+            Əgər bu sorğunu siz etməmisinizsə, zəhmət olmasa, bu e-poçtu nəzərə almayın.
+        </p>
         <hr>
         <p style="font-size: 12px; color: #aaaaaa;">AZTU Plan Hesabat İnformasiya Sistemi. Bütün hüquqlar qorunur.</p>
     </div>

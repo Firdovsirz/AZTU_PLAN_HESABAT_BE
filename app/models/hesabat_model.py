@@ -1,4 +1,3 @@
-from app.db.session import Base
 from sqlalchemy import (
     UniqueConstraint,
     Column,
@@ -7,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     Boolean
 )
+from app.db.database import Base
 
 class Hesabat(Base):
     __tablename__ = "hesabat"

@@ -1,4 +1,3 @@
-from app.db.session import Base
 from sqlalchemy import (
     UniqueConstraint,
     Column,
@@ -8,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey
 )
+from app.db.database import Base
 
 class User(Base):
     __tablename__ = "users"

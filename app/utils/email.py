@@ -1,20 +1,19 @@
+import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from jinja2 import Environment, FileSystemLoader
 
-def send_html_email(recipient_email: str, recipient_name: str):
-    sender_email = "firdovsirz@gmail.com"
-    sender_password = "txjf wgkx mqdi fban"
-    smtp_server = "smtp.gmail.com"
-    smtp_port = 587
+def send_html_email(subject:str, recipient_email: str, recipient_name: str, html_template_content: str):
 
-    env = Environment(loader=FileSystemLoader("templates/email"))
-    template = env.get_template("registration_email.html")
-    html_content = template.render(name=recipient_name)
+    sender_email = os.getenv('SENDER_EMAIL')
+    sender_password = os.getenv('APP_PASSWORD')
+    smtp_server = os.getenv('SMTP_SERVER')
+    smtp_port = os.getenv('SMTP_PORT')
+
+    html_content = html_template_content.replace("{{ name }}", recipient_name)
 
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = "Qeydiyyat təsdiqi"
+    msg["Subject"] = subject
     msg["From"] = sender_email
     msg["To"] = recipient_email
 

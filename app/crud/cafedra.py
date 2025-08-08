@@ -1,40 +1,60 @@
 import os
 import requests
-from fastapi import Depends
 from datetime import datetime
 from app.db.session import get_db
 from sqlalchemy.orm import Session
+from fastapi import Depends, status
+from sqlalchemy.future import select
 from app.models.user_model import User
 from fastapi.responses import JSONResponse
 from app.models.cafedra_model import Cafedra
+from sqlalchemy.ext.asyncio import AsyncSession
 
-def get_caf_name(
+# get cafedra details by cafedra code
+
+async def get_caf_details(
         cafedra_code: str,
-        db: Session = Depends(get_db)
+        db: AsyncSession = Depends(get_db)
 ):
     try:
-        cafedra_name = db.query(Cafedra).filter(
-            Cafedra.cafedra_code == cafedra_code
-        ).first().cafedra_name
+        fetched_cafedra_name = await db.execute(
+            select(Cafedra)
+            .where(Cafedra.cafedra_code == cafedra_code)
+        )
 
-        if not cafedra_name:
-            return JSONResponse(content={
-            "statusCode": 404,
-            "message": "Cafedra not found.",
-        }, status_code=404)
+        cafedra = fetched_cafedra_name.scalars().all()
 
-        return JSONResponse(content={
-            "statusCode": 200,
-            "message": "Cafedra name fetched successfully.",
-            "cafedra_name": cafedra_name
-        }, status_code=200)
+        if not cafedra:
+            return JSONResponse(
+                content={
+                "statusCode": 404,
+                "message": "Cafedra not found.",
+            }, status_code=status.HTTP_404_NOT_FOUND
+        )
+
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Cafedra name fetched successfully.",
+                "cafedra": [
+                    {
+                        "faculty_code": cafedra.faculty_code,
+                        "cafedra_code": cafedra.cafedra_code,
+                        "cafedra_name": cafedra.cafedra_name,
+                        "created_at": cafedra.created_at.isoformat() if cafedra.created_at else None
+                    } for cafedra in cafedra
+                ]
+            }, status_code=status.HTTP_200_OK
+        )
     
     except Exception as e:
-        return JSONResponse(content={
-            "error": str(e)
-        }, status_code=500)
+        return JSONResponse(
+            content={
+                "error": str(e)
+            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
-def get_cafedras_from_lms(db: Session = Depends(get_db)):
+async def get_cafedras_from_lms(db: AsyncSession = Depends(get_db)):
     api_url = os.getenv('LMS_API_CAFEDRAS')
     if not api_url:
         return JSONResponse(content={"error": "LMS_API_CAFEDRAS environment variable is not set."}, status_code=500)
@@ -73,98 +93,126 @@ def get_cafedras_from_lms(db: Session = Depends(get_db)):
             except Exception as e:
                 print("Skipping item due to error:", e, item)
 
-        db.commit()
+        await db.commit()
 
         if validated_faculties:
-            return JSONResponse(content={
-                "statusCode": 200,
-                "message": "Faculties fetched successfully",
-                "faculties": validated_faculties
-            }, status_code=200)
+            return JSONResponse(
+                content={
+                    "statusCode": 200,
+                    "message": "Faculties fetched successfully",
+                    "faculties": validated_faculties
+                }, status_code=status.HTTP_200_OK
+            )
         else:
-            return JSONResponse(content={
-                "statusCode": 200,
-                "message": "No faculties returned from LMS.",
-                "faculties": []
-            }, status_code=200)
+            return JSONResponse(
+                content={
+                    "statusCode": 204,
+                    "message": "No faculties returned from LMS.",
+                    "faculties": []
+                }, status_code=status.HTTP_204_NO_CONTENT
+            )
 
     except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        return JSONResponse(content={
+            "error": str(e)
+        }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+    )
     
-def get_cafedras_by_faculty_code(
+async def get_cafedras_by_faculty_code(
         faculty_code: str,
-        db: Session = Depends(get_db)
+        db: AsyncSession = Depends(get_db)
 ):
     try:
-        cafedras = db.query(Cafedra).filter(
-            faculty_code == Cafedra.faculty_code
-        ).all()
+        fetched_cafedras = await db.execute(
+            select(Cafedra)
+            .where(Cafedra.faculty_code == faculty_code)
+        )
+
+        cafedras = fetched_cafedras.scalars().all()
 
         if not cafedras:
-            return JSONResponse(content={
-                "statusCode": 404,
-                "message": "No cafedra found."
-            }, status_code=404)
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "No cafedra found."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
 
-        return JSONResponse(content={
-            "statusCode": 200,
-            "message": "Cafedras fetched successfully.",
-            "cafedra_count": len(cafedras),
-            "cafedras": [
-                {
-                    "faculty_code": cafedra.faculty_code,
-                    "cafedra_name": cafedra.cafedra_name,
-                    "cafedra_code": cafedra.cafedra_code
-                } for cafedra in cafedras
-            ]
-        })
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Cafedras fetched successfully.",
+                "cafedras": [
+                    {
+                        "cafedra_code": cafedra.cafedra_code,
+                        "cafedra_name": cafedra.cafedra_name
+                    } for cafedra in cafedras
+                ]
+            }, status_code=status.HTTP_200_OK
+        )
 
     except Exception as e:
-        return JSONResponse(content={
-            "error": str(e)
-        }, status_code=500)
+        return JSONResponse(
+            content={
+                "error": str(e)
+            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
     
-def cafedra_users(
+async def cafedra_users(
         cafedra_code: str,
-        db: Session = Depends(get_db)
+        db: AsyncSession = Depends(get_db)
 ):
     try:
 
-        exist_cafedra_code = db.query(Cafedra).filter(
-            Cafedra.cafedra_code == cafedra_code
-        ).first()
+        fetched_cafedra_code = await db.execute(
+            select(Cafedra)
+            .where(Cafedra.cafedra_code == cafedra_code)
+        )
+
+        exist_cafedra_code = fetched_cafedra_code.scalar_one_or_none()
 
         if not exist_cafedra_code:
-            return JSONResponse(content={
-                "statusCode": 404,
-                "message": "No cafedra found."
-            }, status_code=404)
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "No cafedra found."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
         
-        users = db.query(User).filter(
-            User.cafedra_code == cafedra_code
-        ).all()
+        fetched_users = await db.execute(
+            select(User)
+            .where(User.cafedra_code == cafedra_code)
+        )
+
+        users = fetched_users.scalars().all()
 
         if not users:
-            return JSONResponse(content={
-                "statusCode": 204,
-                "message": "No user found."
-            }, status_code=204)
+            return JSONResponse(
+                content={
+                    "statusCode": 204,
+                    "message": "No user found."
+                }, status_code=status.HTTP_204_NO_CONTENT
+            )
         
-        return JSONResponse(content={
-            "statusCode": 200,
-            "message": "Users fetched successfully.",
-            "users": [
-                {
-                    "fin_kod": user.fin_kod,
-                    "name": user.name,
-                    "surname": user.surname,
-                    "father_name": user.father_name,
-                    "is_execution": user.is_execution
-                } for user in users
-            ]
-        })
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Users fetched successfully.",
+                "users": [
+                    {
+                        "fin_kod": user.fin_kod,
+                        "name": user.name,
+                        "surname": user.surname,
+                        "father_name": user.father_name,
+                        "is_execution": user.is_execution
+                    } for user in users
+                ]
+            }, status_code=status.HTTP_200_OK
+        )
     
     except Exception as e:
-        return JSONResponse(content={
-            "error": str(e)
-        }, status_code=500)
+        return JSONResponse(
+            content={
+                "error": str(e)
+            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

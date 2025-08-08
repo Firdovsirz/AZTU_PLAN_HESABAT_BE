@@ -5,7 +5,7 @@ from sqlalchemy import (
     Integer,
     DateTime
 )
-from app.db.session import Base
+from app.db.database import Base
 
 class Duty(Base):
     __tablename__ = "duties"

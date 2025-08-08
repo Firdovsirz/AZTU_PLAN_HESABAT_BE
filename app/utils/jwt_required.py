@@ -1,5 +1,5 @@
-from fastapi import Request, HTTPException, Depends
 from app.utils.jwt_util import decode_auth_token
+from fastapi import Request, HTTPException, Depends
 
 def token_required(allowed_roles=None):
     async def dependency(request: Request):
