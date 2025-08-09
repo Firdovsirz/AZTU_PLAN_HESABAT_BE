@@ -1,11 +1,12 @@
 import os
 import requests
+from sqlalchemy import func
 from datetime import datetime
 from app.db.session import get_db
-from sqlalchemy.orm import Session
-from fastapi import Depends, status
 from sqlalchemy.future import select
+from app.models.duty_model import Duty
 from app.models.user_model import User
+from fastapi import Depends, status, Query
 from fastapi.responses import JSONResponse
 from app.models.cafedra_model import Cafedra
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -160,7 +161,9 @@ async def get_cafedras_by_faculty_code(
     
 async def cafedra_users(
         cafedra_code: str,
-        db: AsyncSession = Depends(get_db)
+        db: AsyncSession = Depends(get_db),
+        start: int = Query(..., ge=0),
+        end: int = Query(..., ge=1)
 ):
     try:
 
@@ -182,9 +185,19 @@ async def cafedra_users(
         fetched_users = await db.execute(
             select(User)
             .where(User.cafedra_code == cafedra_code)
+            .offset(start)
+            .limit(end - start)
         )
 
         users = fetched_users.scalars().all()
+
+        fetched_total_users = await db.execute(
+            select(func.count())
+            .where(User.cafedra_code == cafedra_code)
+            .select_from(User)
+        )
+
+        total_users = fetched_total_users.scalar()
 
         if not users:
             return JSONResponse(
@@ -198,13 +211,21 @@ async def cafedra_users(
             content={
                 "statusCode": 200,
                 "message": "Users fetched successfully.",
+                "total_user": total_users,
                 "users": [
                     {
                         "fin_kod": user.fin_kod,
                         "name": user.name,
                         "surname": user.surname,
                         "father_name": user.father_name,
-                        "is_execution": user.is_execution
+                        "duty_code": user.duty_code,
+                        "duty_name": ((
+                            await db.execute(
+                                select(Duty)
+                                .where(Duty.duty_code == user.duty_code)
+                            )
+                        )).scalar_one_or_none().duty_name,
+                        "is_execution": user.is_execution,
                     } for user in users
                 ]
             }, status_code=status.HTTP_200_OK

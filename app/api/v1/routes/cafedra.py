@@ -25,9 +25,11 @@ async def get_caf_details_endpoint(
 ):
     return await get_caf_details(cafedra_code, db)
 
-@router.get("/cafedra/{cafedra_code}/users")
+@router.get("/cafedra/{cafedra_code}/users/{start}/{end}")
 async def get_cafedra_users_endpoint(
+    start: int,
+    end: int,
     cafedra_code:   Annotated[str, Path(..., description="Cafedra Code")],
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
-    return await cafedra_users(cafedra_code, db)
+    return await cafedra_users(cafedra_code, db, start, end)

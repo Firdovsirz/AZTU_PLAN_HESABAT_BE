@@ -10,6 +10,54 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Body, status, Query
 from app.api.v1.schemas.user_schema import CreateUser
 
+# Get single dekan by faculty code
+
+async def get_dekan(
+    faculty_code:  str,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        fetched_dekan = await db.execute(
+            select(User)
+            .where(User.faculty_code == faculty_code, User.duty_code == 1)
+        )
+
+        dekan = fetched_dekan.scalar_one_or_none()
+
+        if not dekan:
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "No dekan found."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Dekan fetched successfully",
+                "dekan": {
+                    "name": dekan.name,
+                    "surname": dekan.surname,
+                    "father_name": dekan.father_name,
+                    "fin_kod": dekan.fin_kod,
+                    "is_execution": dekan.is_execution,
+                    "created_at": dekan.created_at.isoformat() if dekan.created_at else None,
+                    "updated_at": dekan.updated_at.isoformat() if dekan.updated_at else None
+                }
+            }, status_code=status.HTTP_200_OK
+        )
+    
+    except Exception as e:
+        return JSONResponse(
+            content={
+                "error": str(e),
+                "statusCode": 500
+            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+    
+# Get all dekans
+
 async def dekans(
     db: AsyncSession = Depends(get_db),
     start: int = Query(..., ge=0),
@@ -69,7 +117,55 @@ async def dekans(
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+# Get single caf director by cafedra code
+
+async def caf_director(
+    cafedra_code: str,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        fetched_director = await db.execute(
+            select(User)
+            .where(User.duty_code == 4)
+        )
+
+        caf_director = fetched_director.scalar_one_or_none()
+
+        if not caf_director:
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "No cafedra director found."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Cafedra director fetched successfully",
+                "caf_director": {
+                    "name": caf_director.name,
+                    "surname": caf_director.surname,
+                    "father_name": caf_director.father_name,
+                    "fin_kod": caf_director.fin_kod,
+                    "is_execution": caf_director.is_execution,
+                    "created_at": caf_director.created_at.isoformat() if caf_director.created_at else None,
+                    "updated_at": caf_director.updated_at.isoformat() if caf_director.updated_at else None
+                }
+            }, status_code=status.HTTP_200_OK
+        )
     
+    except Exception as e:
+        return JSONResponse(
+            content={
+                "error": str(e),
+                "statusCode": 500
+            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+# Get all cafedra directors
+
 async def caf_directors(
     db: AsyncSession = Depends(get_db),
     start: int = Query(..., ge=0),
@@ -129,6 +225,8 @@ async def caf_directors(
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+# Get all users
 
 async def all_users (
     db: AsyncSession = Depends(get_db),
@@ -194,6 +292,8 @@ async def all_users (
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+# Create user
+
 async def create_user(
         form_data: CreateUser = Body(...),
         db: AsyncSession = Depends(get_db)
@@ -253,7 +353,9 @@ async def create_user(
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-    
+
+# Get a single user by fin kod
+
 async def get_user_by_fin_kod(
     fin_kod: str,
     db: AsyncSession = Depends(get_db)
@@ -301,6 +403,8 @@ async def get_user_by_fin_kod(
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
+# Get execution users where is_execution == True
+
 async def get_execution_users(
         db: AsyncSession = Depends(get_db),
         start: int = Query(0, ge=0),
@@ -353,6 +457,8 @@ async def get_execution_users(
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+# Get approve waiting users where approveed == False
 
 async def get_app_waiting_users(
     db: AsyncSession = Depends(get_db)
