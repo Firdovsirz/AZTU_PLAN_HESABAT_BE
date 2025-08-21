@@ -28,3 +28,5 @@ class Hesabat(Base):
     duration_analysis = Column(Integer)
     note = Column(String)
     submitted = Column(Boolean, default=False)
+    done = Column(Boolean, default=False)
+    done_at = Column(DateTime)

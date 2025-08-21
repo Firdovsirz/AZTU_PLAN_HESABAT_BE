@@ -1,11 +1,11 @@
 import random
 import asyncio
-import logging
+from sqlalchemy import func
 from typing import Annotated
 from datetime import datetime
 from app.db.session import get_db
 from sqlalchemy.future import select
-from jwt import ExpiredSignatureError
+from app.models.duty_model import Duty
 from app.models.user_model import User
 from app.models.auth_model import Auth
 from fastapi.responses import JSONResponse
@@ -13,13 +13,11 @@ from app.utils.email import send_html_email
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.utils.jwt_util import encode_otp_token
-from fastapi import Depends, status, HTTPException
+from fastapi import Depends, status, HTTPException, Query
 from app.utils.password import hash_password, verify_password
 from app.utils.jwt_util import encode_auth_token, decode_otp_token
 from app.api.v1.schemas.auth_schema import AuthCreate, Signin, ResetPassword
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
 templates = Jinja2Templates(directory="templates")
 
 async def generateOtp(length: int = 6) -> str:
@@ -30,10 +28,7 @@ async def signup(
         form_data: Annotated[AuthCreate, Depends(AuthCreate.as_form)],
         db: AsyncSession = Depends(get_db)
 ):
-    logger.info("Signup endpoint triggered")
-    logger.info(f"Received form data: {form_data}")
     try:
-        logger.info(f"Checking if user exists with fin_kod: {form_data.fin_kod}")
         fetched_user = await db.execute(
             select(Auth)
             .where(Auth.fin_kod == form_data.fin_kod)
@@ -60,7 +55,6 @@ async def signup(
                 "message": "Email already exits."
             }, status_code=status.HTTP_409_CONFLICT)
         
-        logger.info("Creating new auth and user records")
         new_auth_user = Auth(
             fin_kod=form_data.fin_kod,
             role=form_data.role,
@@ -102,7 +96,6 @@ async def signup(
         }, status_code=status.HTTP_201_CREATED)
 
     except Exception as e:
-        logger.exception(f"Signup error: {e}")
         return JSONResponse(content={
             "error": str(e)
         }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)   
@@ -260,7 +253,9 @@ async def reject_app_user(
         }, status_code=500)
 
 async def app_wait_users(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    start: int = Query(..., ge=0),
+    end: int = Query(..., ge=1)
 ):
     try:
         fetched_users = await db.execute(
@@ -276,9 +271,19 @@ async def app_wait_users(
                 User.created_at
             )
             .where(User.approved == False)
+            .offset(start)
+            .limit(end-start)
         )
 
         users = fetched_users.all()
+
+        user_count = await db.execute(
+            select(func.count())
+            .select_from(Auth)
+            .where(Auth.approved == False)
+        )
+
+        total_users = user_count.scalar()
 
         if not users:
             return JSONResponse(
@@ -292,6 +297,7 @@ async def app_wait_users(
             content={
                 "status": 200,
                 "message": "SUCCESS",
+                "total_users": total_users,
                 "users": [
                     {
                         "fin_kod": user[0],
@@ -302,6 +308,12 @@ async def app_wait_users(
                         "duty_code": user[5],
                         "faculty": user[6],
                         "cafedra": user[7],
+                        "duty_name": ((
+                            await db.execute(
+                                select(Duty)
+                                .where(Duty.duty_code == user[5])
+                            )
+                        )).scalar_one_or_none().duty_name,
                         "created_at": user[8].isoformat() if user[8] else None
                     } for user in users
                 ]
@@ -435,11 +447,11 @@ async def validate_otp(
         )
 
 async def reset_password(
-    request: ResetPassword,
+    reset_data: ResetPassword,
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        decoded_token = decode_otp_token(request.token)
+        decoded_token = decode_otp_token(reset_data.token)
         fin_kod = decoded_token['fin_kod']
 
         fetched_auth_user = await db.execute(
@@ -457,7 +469,7 @@ async def reset_password(
                 }, status_code=status.HTTP_401_UNAUTHORIZED
             )
 
-        if verify_password(request.password, auth_user.password):
+        if verify_password(reset_data.password, auth_user.password):
             return JSONResponse(
                 content={
                     "statusCode": 400,
@@ -465,7 +477,7 @@ async def reset_password(
                 }, status_code=status.HTTP_400_BAD_REQUEST
             )
 
-        auth_user.password = hash_password(request.password)
+        auth_user.password = hash_password(reset_data.password)
 
         await db.commit()
         await db.refresh(auth_user)

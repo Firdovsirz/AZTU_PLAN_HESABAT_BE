@@ -1,3 +1,5 @@
+from sqlalchemy import or_
+from typing import Optional
 from sqlalchemy import func
 from datetime import datetime
 from app.db.session import get_db
@@ -8,7 +10,7 @@ from fastapi.responses import JSONResponse
 from app.models.faculty_model import Faculty
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import Depends, Body, status, Query
-from app.api.v1.schemas.user_schema import CreateUser
+from app.api.v1.schemas.user_schema import CreateUser, UpdateUser
 
 # Get single dekan by faculty code
 
@@ -228,35 +230,55 @@ async def caf_directors(
 
 # Get all users
 
-async def all_users (
+async def all_users(
     db: AsyncSession = Depends(get_db),
     start: int = Query(..., ge=0),
-    end: int = Query(..., ge=1)
+    end: int = Query(..., ge=1),
+    name: Optional[str] = Query(None),
+    surname: Optional[str] = Query(None),
+    father_name: Optional[str] = Query(None),
+    fin_kod: Optional[str] = Query(None),
+    faculty_code: Optional[str] = Query(None),
+    cafedra_code: Optional[str] = Query(None),
 ):
     try:
-        fetched_users = await db.execute(
-            select(User)
-            .offset(start)
-            .limit(end - start)
-        )
+        filters = []
+        if name:
+            filters.append(User.name.ilike(f"{name}%"))
+        if surname:
+            filters.append(User.surname.ilike(f"{surname}%"))
+        if father_name:
+            filters.append(User.father_name.ilike(f"%{father_name}%"))
+        if fin_kod:
+            filters.append(User.fin_kod.ilike(f"%{fin_kod}%"))
+        if faculty_code and cafedra_code:
+            filters.append(User.faculty_code == faculty_code)
+            filters.append(User.cafedra_code == cafedra_code)
+        elif faculty_code:
+            filters.append(User.faculty_code == faculty_code)
+        elif cafedra_code:
+            filters.append(User.cafedra_code == cafedra_code)
 
+        print(filters)
+
+        query = select(User)
+        if filters:
+            query = query.where(*filters)
+        query = query.offset(start).limit(end - start)
+        fetched_users = await db.execute(query)
         users = fetched_users.scalars().all()
 
-        user_count = await db.execute(
-            select(func.count())
-            .select_from(User)
-        )
-
-        total_users = user_count.scalar()
+        count_query = select(func.count()).select_from(User)
+        if filters:
+            count_query = count_query.where(*filters)
+        total_users = (await db.execute(count_query)).scalar()
 
         if not users:
             return JSONResponse(
-                content={
-                    "statusCode": 204,
-                    "message": "No content"
-                }, status_code=status.HTTP_204_NO_CONTENT
+                content={"statusCode": 204, "message": "No content"},
+                status_code=status.HTTP_204_NO_CONTENT
             )
-        
+
         return JSONResponse(
             content={
                 "statusCode": 200,
@@ -264,32 +286,31 @@ async def all_users (
                 "total_users": total_users,
                 "users": [
                     {
-                        "name": user.name,
-                        "surname": user.surname,
-                        "father_name": user.father_name,
-                        "fin_kod": user.fin_kod,
-                        "email": user.email,
-                        "faculty_code": user.faculty_code,
+                        "name": u.name,
+                        "surname": u.surname,
+                        "father_name": u.father_name,
+                        "fin_kod": u.fin_kod,
+                        "email": u.email,
+                        "faculty_code": u.faculty_code,
                         "duty_name": (
                             (duty := (await db.execute(
-                                select(Duty).where(Duty.duty_code == int(user.duty_code))
+                                select(Duty).where(Duty.duty_code == int(u.duty_code))
                             )).scalar_one_or_none()) and duty.duty_name
-                            if user.duty_code is not None else None
+                            if u.duty_code is not None else None
                         ),
-                        "created_at": user.created_at.isoformat() if user.created_at else None,
-                        "updated_at": user.updated_at.isoformat() if user.updated_at else None,
-                        "is_execution": user.is_execution
-                    } for user in users
+                        "created_at": u.created_at.isoformat() if u.created_at else None,
+                        "updated_at": u.updated_at.isoformat() if u.updated_at else None,
+                        "is_execution": u.is_execution
+                    } for u in users
                 ]
-            }, status_code=status.HTTP_200_OK
+            },
+            status_code=status.HTTP_200_OK
         )
-    
+
     except Exception as e:
         return JSONResponse(
-            content={
-                "error": str(e),
-                "statusCode": 500
-            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            content={"error": str(e), "statusCode": 500},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 # Create user
@@ -353,6 +374,62 @@ async def create_user(
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+# Update user details
+
+async def update_user(
+    user_details: UpdateUser,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        result = await db.execute(
+            select(User)
+            .where(User.fin_kod == user_details.fin_kod)
+        )
+
+        user = result.scalar_one_or_none()
+
+        if not user:
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "User not found."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
+        
+        if user_details.name is not None:
+            user.name = user_details.name
+        if user_details.surname is not None:
+            user.surname = user_details.surname
+        if user_details.father_name is not None:
+            user.father_name = user_details.father_name
+        if user_details.duty_code is not None:
+            user.duty_code = user_details.duty_code
+        if user_details.faculty_code is not None:
+            user.faculty_code = user_details.faculty_code
+        if user_details.cafedra_code is not None:
+            user.cafedra_code = user_details.cafedra_code
+
+        user.updated_at = datetime.utcnow()
+
+        await db.commit()
+        await db.refresh(user)
+
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "User updated successfully."
+            }, status_code=status.HTTP_200_OK
+        )
+    
+    except Exception as e:
+        return JSONResponse(
+            content={
+                "error": str(e),
+                "statusCode": 500
+            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
 
 # Get a single user by fin kod
 
@@ -442,6 +519,10 @@ async def get_execution_users(
                         "faculty_code": user.faculty_code,
                         "cafedra_code": user.cafedra_code,
                         "duty_code": user.duty_code,
+                        "duty_name": ((await db.execute(
+                            select(Duty)
+                            .where(Duty.duty_code == user.duty_code)
+                        ))).scalar_one_or_none().duty_name,
                         "is_execution": user.is_execution,
                         "created_at": user.created_at.isoformat() if user.created_at else None,
                         "updated_at": user.updated_at.isoformat() if user.updated_at else None
@@ -461,7 +542,7 @@ async def get_execution_users(
 # Get approve waiting users where approveed == False
 
 async def get_app_waiting_users(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     try:
         fetched_users = await db.execute(

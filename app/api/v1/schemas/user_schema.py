@@ -1,4 +1,5 @@
 from fastapi import Form
+from typing import Optional
 from pydantic import BaseModel, Field
 
 class CreateUser(BaseModel):
@@ -27,3 +28,15 @@ class CreateUser(BaseModel):
             duty_code=duty_code,
             is_execution=False
         )
+
+class UpdateUser(BaseModel):
+    fin_kod: str
+    name: Optional[str] = None
+    surname: Optional[str] = None
+    father_name: Optional[str] = None
+    duty_code: Optional[int] = None
+    faculty_code: Optional[str] = None
+    cafedra_code: Optional[str] = None
+
+    class Config:
+        extra = "forbid"

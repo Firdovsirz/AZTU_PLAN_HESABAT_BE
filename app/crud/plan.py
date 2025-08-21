@@ -1,5 +1,5 @@
 import random
-import logging
+from sqlalchemy import func
 from datetime import datetime
 from datetime import datetime
 from app.db.session import get_db
@@ -12,13 +12,89 @@ from app.models.hesabat_model import Hesabat
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.v1.schemas.plan_schema import CreatePlan
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
 async def generate_plan_serial_number():
     year = datetime.now().year
     random_digits = f"{random.randint(0, 999999):06d}"
     return f"PLAN-{year}-{random_digits}"
+
+async def all_plans(
+    db: AsyncSession = Depends(get_db),
+    start: int = Query(..., ge=0),
+    end: int = Query(..., ge=1)
+):
+    try:
+        fetched_plans = await db.execute(
+            select(Plan)
+            .offset(start)
+            .limit(end - start)
+        )
+
+        plans = fetched_plans.scalars().all()
+
+        fetched_total_plans = await db.execute(
+            select(func.count())
+            .select_from(Plan)
+        )
+
+        total_plans = fetched_total_plans.scalar()
+
+        if not plans:
+            return JSONResponse(
+                content={
+                    "statusCode": 204,
+                    "message": "No content"
+                }, status_code=status.HTTP_204_NO_CONTENT
+            )
+        
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "All plans feteched",
+                "total_plans": total_plans,
+                "plans": [
+                    {
+                        "name": ((
+                            await db.execute(
+                                select(User)
+                                .where(User.fin_kod == plan.fin_kod)
+                            )
+                        )).scalar_one_or_none().name,
+                        "surname": ((
+                            await db.execute(
+                                select(User)
+                                .where(User.fin_kod == plan.fin_kod)
+                            )
+                        )).scalar_one_or_none().surname,
+                        "father_name": ((
+                            await db.execute(
+                                select(User)
+                                .where(User.fin_kod == plan.fin_kod)
+                            )
+                        )).scalar_one_or_none().father_name,
+                        "is_submitted": (await db.execute(
+                            select(Hesabat)
+                            .where(Hesabat.work_plan_serial_number == plan.work_plan_serial_number)
+                        )).scalar_one_or_none().submitted,
+                        "work_plan_serial_number": plan.work_plan_serial_number,
+                        "fin_kod": plan.fin_kod,
+                        "work_row_number": plan.work_row_number,
+                        "work_desc": plan.work_desc,
+                        "work_year": plan.work_year,
+                        "activity_type_code": plan.activity_type_code,
+                        "deadline": plan.deadline.isoformat() if plan.deadline else None,
+                        "created_at": plan.created_at.isoformat() if plan.created_at else None
+                    } for plan in plans
+                ]
+            }
+        )
+    
+    except Exception as e:
+        return JSONResponse(
+            content={
+                "error": str(e),
+                "statusCode": 500
+            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 async def create_plan(
         form_data: CreatePlan = Depends(CreatePlan.as_form),
@@ -46,10 +122,8 @@ async def create_plan(
         last_plan = fetched_last_plan.scalar_one_or_none()
 
         next_work_row_number = 1 if not last_plan else last_plan.work_row_number + 1
-        logger.info("Next work row number: %s", next_work_row_number)
 
         generated_serial_number = await generate_plan_serial_number()
-        logger.info("Generated plan serial number: %s", generated_serial_number)
 
         new_plan = Plan(
             fin_kod=form_data.fin_kod,
@@ -63,7 +137,6 @@ async def create_plan(
             created_at=datetime.utcnow(),
             updated_at=None
         )
-        logger.info("Creating new Plan object: %s", new_plan)
 
         db.add(new_plan)
 
@@ -73,11 +146,9 @@ async def create_plan(
             activity_type_code=int(form_data.activity_type_code),
             activity_type_name=form_data.activity_type_name if form_data.activity_type_name else None,
         )
-        logger.info("Creating new Hesabat object: %s", new_hesabat)
 
         db.add(new_hesabat)
 
-        logger.info("Fetching user with fin_kod: %s", form_data.fin_kod)
         fetched_user = await db.execute(
             select(User)
             .where(User.fin_kod == form_data.fin_kod)
@@ -86,9 +157,7 @@ async def create_plan(
         user = fetched_user.scalar_one_or_none()
 
         user.is_execution = True
-        logger.info("Setting user.is_execution to True")
 
-        logger.info("Committing to database")
         await db.commit()
         await db.refresh(user)
         await db.refresh(new_plan)
@@ -101,7 +170,6 @@ async def create_plan(
         )
     
     except Exception as e:
-        logger.exception("Unhandled exception in create_plan")
         return JSONResponse(
             content={
                 "error": str(e),
@@ -154,7 +222,6 @@ async def get_plan_by_fin_kod(
         )
     
     except Exception as e:
-        logger.exception("Error occurred while creating plan")
         return JSONResponse(
             content={
                 "error": str(e),

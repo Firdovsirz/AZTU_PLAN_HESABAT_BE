@@ -1,5 +1,3 @@
-import logging
-logger = logging.getLogger(__name__)
 from datetime import datetime
 from app.db.session import get_db
 from sqlalchemy.orm import Session
@@ -14,32 +12,23 @@ async def create_activity(
         db: Session = Depends(get_db)
 ):
     try:
-        logger.info(f"Attempting to create activity with name: {activity_type_name}")
-        
         fetched_name = await db.execute(
             select(Activity)
             .where(Activity.activity_type_name == activity_type_name)
         )
-        logger.debug("Executed query to check if name exists")
-
         exist_name = fetched_name.scalar_one_or_none()
-        logger.debug(f"Exist name result: {exist_name}")
 
         fetched_activity = await db.execute(
             select(Activity)
             .order_by(Activity.activity_type_code.desc())
             .limit(1)
         )
-        logger.debug("Executed query to get max activity code")
 
         max_activity_obj = fetched_activity.scalar_one_or_none()
-        logger.debug(f"Max activity object: {max_activity_obj}")
 
         max_activity_code = max_activity_obj.activity_type_code if max_activity_obj else 0
-        logger.debug(f"Resolved max activity code: {max_activity_code}")
 
         if exist_name:
-            logger.warning("Activity name already exists")
             return JSONResponse(
                 content={
                     "statusCode": 409,
@@ -56,8 +45,6 @@ async def create_activity(
         db.add(new_activity)
         await db.commit()
         await db.refresh(new_activity)
-
-        logger.info(f"Activity created with code {new_activity.activity_type_code}")
         
         return JSONResponse(content={
             "statusCode": 201,
@@ -65,7 +52,6 @@ async def create_activity(
         }, status_code=status.HTTP_201_CREATED)
     
     except Exception as e:
-        logger.error(f"Error occurred in create_activity: {str(e)}", exc_info=True)
         return JSONResponse(
             content={
                 "error": str(e)
