@@ -1,17 +1,38 @@
+import logging
+from sqlalchemy import or_
 from datetime import datetime
 from app.db.session import get_db
-from sqlalchemy.orm import Session
 from fastapi import Depends, status
 from sqlalchemy.future import select
+from app.models.user_model import User
 from fastapi.responses import JSONResponse
 from app.models.activity_model import Activity
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 async def create_activity(
         activity_type_name: str,
-        db: Session = Depends(get_db)
+        fin_kod: str,
+        db: AsyncSession = Depends(get_db)
 ):
     try:
+        query_result = await db.execute(
+            select(User)
+            .where(User.fin_kod == fin_kod)
+        )
+
+        user = query_result.scalar_one_or_none()
+
+        if not user:
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "User is not available."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
+
         fetched_name = await db.execute(
             select(Activity)
             .where(Activity.activity_type_name == activity_type_name)
@@ -39,7 +60,9 @@ async def create_activity(
         new_activity = Activity(
             activity_type_code=max_activity_code+1,
             activity_type_name=activity_type_name,
-            created_at=datetime.utcnow()
+            created_at=datetime.utcnow(),
+            approved=False,
+            fin_kod=fin_kod
         )
 
         db.add(new_activity)
@@ -48,20 +71,31 @@ async def create_activity(
         
         return JSONResponse(content={
             "statusCode": 201,
-            "message": "Activity created successfully."
+            "message": "Activity created successfully.",
+            "activity_type_code": max_activity_code + 1,
+            "activity_type_name": activity_type_name,
+            "created_at": datetime.utcnow().isoformat(),
+            "id": new_activity.id
         }, status_code=status.HTTP_201_CREATED)
     
     except Exception as e:
+        logger.exception("Error while creating activity")
         return JSONResponse(
             content={
                 "error": str(e)
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
-async def get_activity(db: AsyncSession  = Depends(get_db)):
+async def get_activity(fin_kod: str, db: AsyncSession  = Depends(get_db)):
     try: 
         fetched_activies = await db.execute(
             select(Activity)
+            .where(
+                or_(
+                    Activity.approved == True,
+                    Activity.fin_kod == fin_kod
+                )
+            )
         )
 
         activities = fetched_activies.scalars().all()
@@ -90,6 +124,7 @@ async def get_activity(db: AsyncSession  = Depends(get_db)):
         )
     
     except Exception as e:
+        logger.exception("Error while fetching activities")
         return JSONResponse(
             content={
                 "error": str(e)
@@ -125,6 +160,7 @@ async def get_activity_name_by_code(
         )
     
     except Exception as e:
+        logger.exception("Error while fetching activity name by code")
         return JSONResponse(
             content={
                 "error": str(e)
@@ -162,6 +198,7 @@ async def delete_activity(
         )
     
     except Exception as e:
+        logger.exception("Error while deleting activity")
         return JSONResponse(
             content={
                 "error": str(e)

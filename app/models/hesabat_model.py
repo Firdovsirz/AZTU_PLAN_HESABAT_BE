@@ -10,13 +10,10 @@ from app.db.database import Base
 
 class Hesabat(Base):
     __tablename__ = "hesabat"
-    __table_args__ = (
-        UniqueConstraint("work_plan_serial_number"),
-    )
 
     id = Column(Integer, primary_key=True, index=True)
     fin_kod = Column(String, nullable=False)
-    work_plan_serial_number = Column(String, unique=True)
+    work_plan_serial_number = Column(String)
     activity_doc_path = Column(String)
     done_percentage = Column(String)
     assessment_score = Column(Integer)

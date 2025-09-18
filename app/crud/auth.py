@@ -490,7 +490,6 @@ async def reset_password(
         )
     
     except HTTPException:
-        # Re-raise HTTP exceptions for FastAPI to handle (401, 422, etc)
         raise
 
     except Exception as e:

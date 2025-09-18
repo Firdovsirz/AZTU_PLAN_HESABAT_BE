@@ -31,6 +31,13 @@ app = FastAPI(
 
 register_limiter(app)
 
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,  # or INFO if you don’t want too much noise
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 app.add_middleware(

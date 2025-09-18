@@ -10,6 +10,17 @@ from app.api.v1.schemas.auth_schema import AuthCreate, Signin, ResetPassword
 
 router = APIRouter()
 
+@router.get("/app-wait-users/{start}/{end}")
+@limiter.limit("10/second")
+async def get_app_wait_users_end(
+    request: Request,
+    start: int,
+    end: int,
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([0, 1]))
+):
+    return await app_wait_users(db, start, end)
+
 @router.post("/signup")
 @limiter.limit("50/minute")
 async def signup_endpoint(
@@ -38,27 +49,6 @@ async def approve_user_endpoint(
 ):
     return await approve_user(fin_kod, db)
 
-@router.delete("/reject-user/{fin_kod}")
-@limiter.limit("20/minute")
-async def approve_user_endpoint(
-    request: Request,
-    fin_kod: Annotated[str, Path(..., description="Fin Kod")],
-    db: AsyncSession = Depends(get_db),
-    _current_user=Depends(token_required([0, 1]))
-):
-    return await reject_app_user(fin_kod, db)
-
-@router.get("/app-wait-users/{start}/{end}")
-@limiter.limit("10/second")
-async def get_app_wait_users_end(
-    request: Request,
-    start: int,
-    end: int,
-    db: AsyncSession = Depends(get_db),
-    _current_user=Depends(token_required([0, 1]))
-):
-    return await app_wait_users(db, start, end)
-
 @router.post("/send-otp/{fin_kod}")
 @limiter.limit("20/minute")
 async def send_otp_endpoint(
@@ -86,3 +76,13 @@ async def reset_pass_endpoint(
     db: AsyncSession = Depends(get_db)
 ):
     return await reset_password(reset_data, db)
+
+@router.delete("/reject-user/{fin_kod}")
+@limiter.limit("20/minute")
+async def approve_user_endpoint(
+    request: Request,
+    fin_kod: Annotated[str, Path(..., description="Fin Kod")],
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([0, 1]))
+):
+    return await reject_app_user(fin_kod, db)

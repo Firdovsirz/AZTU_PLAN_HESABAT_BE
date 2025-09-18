@@ -62,7 +62,7 @@ async def get_caf_director_endpoint(
 # Get users with optional filters and pagination via query parameters
 
 @router.get("/users")
-@limiter.limit("5/minute")
+@limiter.limit("100/minute")
 async def get_all_users(
     request: Request,
     start: int = Query(0, description="Pagination start index", ge=0),
@@ -91,7 +91,7 @@ async def get_all_users(
 # Get user by fin kod
 
 @router.get("/user/{fin_kod}")
-@limiter.limit("5/minute")
+@limiter.limit("100/minute")
 async def get_user_endpoint(
     request: Request,
     fin_kod: Annotated[str, Path(..., description="Fin kod")],
@@ -103,7 +103,7 @@ async def get_user_endpoint(
 # Get execution users by pagination
 
 @router.get("/users/execution/{start}/{end}")
-@limiter.limit("5/minute")
+@limiter.limit("100/minute")
 async def get_users_endpoint(
     request: Request,
     start: int,
@@ -116,7 +116,7 @@ async def get_users_endpoint(
 # Get all approve waiting users
 
 @router.get("/users/app-waiting")
-@limiter.limit("5/minute")
+@limiter.limit("100/minute")
 async def get_app_waiting_users_endpoint(
     request: Request,
     db: AsyncSession = Depends(get_db),

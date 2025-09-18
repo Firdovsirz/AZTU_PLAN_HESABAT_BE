@@ -19,8 +19,8 @@ async def submitted_hesabats_endpoint(
     start: int,
     end: int,
     db: AsyncSession = Depends(get_db),
-    _current_user=Depends(token_required([0, 1])),
-    swagger_token: str = Security(bearer_scheme)
+    # _current_user=Depends(token_required([0, 1])),
+    # swagger_token: str = Security(bearer_scheme)
 ):
     return await submitted_hesabats(db, start, end)
 
@@ -32,9 +32,9 @@ async def get_hesabat_by_fin_kod_endpoint(
     start: int,
     end: int,
     db: AsyncSession = Depends(get_db),
-    _current_user=Depends(token_required([0, 1, 2, 3, 4]))
+    # _current_user=Depends(token_required([0, 1, 2, 3, 4]))
 ):
-    return await get_hesabat_by_fin_kod(fin_kod, db, start, end)
+    return await get_hesabat_by_fin_kod(fin_kod, start, end, db)
 
 @router.get("/hesabat/plan/{serial_number}")
 @limiter.limit("50/minute")
@@ -42,9 +42,30 @@ async def get_hesabat_by_fin_kod_endpoint(
     request: Request,
     serial_number:  Annotated[str, Path(..., description="Serial Number")],
     db: AsyncSession = Depends(get_db),
-    _current_user=Depends(token_required([0, 1, 2, 3, 4]))
+    # _current_user=Depends(token_required([0, 1, 2, 3, 4]))
 ):
     return await get_hesabat_by_serial_number(serial_number, db)
+
+
+@router.get("/doc/{work_plan_serial_number}/{doc_name}")
+@limiter.limit("50/minute")
+async def get_doc_endpoint(
+    request: Request,
+    serial_number: Annotated[str, Path(..., description="Work Serial Number")],
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([0, 1, 2, 3, 4]))
+):
+    return await get_doc_by_serial_number(serial_number, db)
+
+@router.get("/archive/{start}/{end}")
+@limiter.limit("10/minute")
+async def archive_endpoint(
+    request: Request,
+    start: int,
+    end: int,
+    db: AsyncSession = Depends(get_db)
+):
+    return await get_archive(db, start, end)
 
 @router.post("/done-hesabat/{work_plan_serial_number}")
 @limiter.limit("10/minute")
@@ -66,17 +87,7 @@ async def submit_hesabat_endpoint(
 ):
     return await submit_hesabat(form_data, db)
 
-@router.get("/doc/{work_plan_serial_number}/{doc_name}")
-@limiter.limit("50/minute")
-async def get_doc_endpoint(
-    request: Request,
-    serial_number: Annotated[str, Path(..., description="Work Serial Number")],
-    db: AsyncSession = Depends(get_db),
-    _current_user=Depends(token_required([0, 1, 2, 3, 4]))
-):
-    return await get_doc_by_serial_number(serial_number, db)
-
-@router.post("/assessment")
+@router.post("/hesabat/assessment")
 @limiter.limit("10/minute")
 async def set_assessment(
     request: Request,
@@ -86,7 +97,7 @@ async def set_assessment(
 ):
     return await add_assessment(assessment_data, db)
 
-@router.patch("/assessment/update")
+@router.patch("/hesabat/assessment/update")
 @limiter.limit("10/minute")
 async def update_assessment_endpoint(
     request: Request,
@@ -95,16 +106,6 @@ async def update_assessment_endpoint(
     _current_user=Depends(token_required([0, 1]))
 ):
     return await update_assessment(assessment_data, db)
-
-@router.get("/archive/{start}/{end}")
-@limiter.limit("10/minute")
-async def archive_endpoint(
-    request: Request,
-    start: int,
-    end: int,
-    db: AsyncSession = Depends(get_db)
-):
-    return await get_archive(db, start, end)
 
 @router.delete("/hesabat/{work_plan_serial_number}/delete")
 @limiter.limit("10/minute")

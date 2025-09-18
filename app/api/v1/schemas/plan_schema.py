@@ -1,12 +1,12 @@
 from fastapi import Form
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field
 
 class CreatePlan(BaseModel):
     fin_kod: str = Field(..., max_length=7)
     work_year: int
-    activity_type_code: str
+    activity_type_code: List[str]
     activity_type_name: Optional[str] = Form(None)
     work_desc: str
     deadline: datetime
@@ -15,7 +15,7 @@ class CreatePlan(BaseModel):
     def as_form(cls,
                 fin_kod: str = Form(...),
                 work_year: int = Form(...),
-                activity_type_code: str = Form(...),
+                activity_type_code: List[str] = Form(...),
                 activity_type_name: Optional[str] = Form(None),
                 work_desc: str = Form(...),
                 deadline: str = Form(...),
@@ -28,3 +28,8 @@ class CreatePlan(BaseModel):
             work_desc=work_desc,
             deadline=deadline,
         )
+    
+class AddActivityToPlan(BaseModel):
+    work_plan_serial_number: str
+    activity_type_codes: List[str]
+    activity_type_names: Optional[List[str]] = None

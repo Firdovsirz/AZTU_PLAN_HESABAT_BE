@@ -1,4 +1,5 @@
 import os
+import logging
 from sqlalchemy import func
 from datetime import datetime
 from shutil import copyfileobj
@@ -15,6 +16,10 @@ from fastapi import Depends, UploadFile, status, Query
 from app.api.v1.schemas.hesabat_schema import CreateHesabat
 from app.api.v1.schemas.hesabat_schema import SetAssessmentSchema, UpdateAssessmentScore
 
+# Logger for submit_hesabat debugging
+logger = logging.getLogger("submit_hesabat_logger")
+logging.basicConfig(level=logging.INFO)
+
 # Get all submitted hesabats
 
 async def submitted_hesabats(
@@ -25,80 +30,81 @@ async def submitted_hesabats(
     try:
         fetched_hesabats = await db.execute(
             select(Hesabat)
-            .where(Hesabat.submitted == True)
-            .offset(start)
-            .limit(end - start)
+            .where(Hesabat.submitted == True, Hesabat.done != True)
+            .order_by(Hesabat.work_plan_serial_number, Hesabat.activity_type_code)
         )
-
         hesabats = fetched_hesabats.scalars().all()
 
         if not hesabats:
             return JSONResponse(
-                content={
-                    "statusCode": 204,
-                    "message": "No content"
-                }, status_code=status.HTTP_204_NO_CONTENT
+                content={"statusCode": 204, "message": "No content"},
+                status_code=status.HTTP_204_NO_CONTENT
             )
-        
+
+        # Collect all unique fin_kods and work_plan_serial_numbers
+        fin_kods = {h.fin_kod for h in hesabats}
+        plan_serials = {h.work_plan_serial_number for h in hesabats}
+        activity_codes = {int(h.activity_type_code) for h in hesabats if h.activity_type_code is not None}
+
+        # Fetch all users
+        users_result = await db.execute(select(User).where(User.fin_kod.in_(fin_kods)))
+        users = users_result.scalars().all()
+        user_map = {u.fin_kod: u for u in users}
+
+        # Fetch all plans
+        plans_result = await db.execute(select(Plan).where(Plan.work_plan_serial_number.in_(plan_serials)))
+        plans = plans_result.scalars().all()
+        plan_map = {p.work_plan_serial_number: p for p in plans}
+
+        # Fetch all activities
+        activities_result = await db.execute(select(Activity.activity_type_code, Activity.activity_type_name).where(Activity.activity_type_code.in_(activity_codes)))
+        activities = activities_result.all()
+        activity_map = {int(code): name for code, name in activities}
+
+        grouped = {}
+        for hesabat in hesabats:
+            key = hesabat.work_plan_serial_number
+            if key not in grouped:
+                user = user_map.get(hesabat.fin_kod)
+                plan = plan_map.get(hesabat.work_plan_serial_number)
+                grouped[key] = {
+                    "name": user.name if user else None,
+                    "surname": user.surname if user else None,
+                    "father_name": user.father_name if user else None,
+                    "fin_kod": hesabat.fin_kod,
+                    "plan_work_serial_number": hesabat.work_plan_serial_number,
+                    "activity_type_codes": [],
+                    "activity_type_names": [],
+                    "activity_doc_path": f"/static/report/{hesabat.work_plan_serial_number}/{os.path.basename(hesabat.activity_doc_path)}" if hesabat.activity_doc_path else None,
+                    "done_percentage": hesabat.done_percentage,
+                    "work_year": plan.work_year if plan else None,
+                    "assessment_score": hesabat.assessment_score,
+                    "admin_assessment": hesabat.admin_assessment,
+                    "ai_assessment": hesabat.ai_assessment,
+                    "submitted_at": hesabat.submitted_at.isoformat() if hesabat.submitted_at else None,
+                    "duration_analysis": hesabat.duration_analysis,
+                    "note": hesabat.note,
+                    "submitted": hesabat.submitted,
+                    "done": hesabat.done
+                }
+            code_int = int(hesabat.activity_type_code) if hesabat.activity_type_code is not None else None
+            grouped[key]["activity_type_codes"].append(code_int)
+            grouped[key]["activity_type_names"].append(activity_map.get(code_int, "Unknown"))
+
+        grouped_list = list(grouped.values())[start:end]
+
         return JSONResponse(
             content={
                 "statusCode": 200,
                 "message": "Submitted hesabats fetched successfully",
-                "hesabats": [
-                    {
-                        "name": ((
-                            await db.execute(
-                                select(User)
-                                .where(User.fin_kod == hesabat.fin_kod)
-                            )
-                        )).scalar_one_or_none().name,
-                        "surname": ((
-                            await db.execute(
-                                select(User)
-                                .where(User.fin_kod == hesabat.fin_kod)
-                            )
-                        )).scalar_one_or_none().surname,
-                        "father_name": ((
-                            await db.execute(
-                                select(User)
-                                .where(User.fin_kod == hesabat.fin_kod)
-                            )
-                        )).scalar_one_or_none().father_name,
-                        "fin_kod": hesabat.fin_kod,
-                        "plan_work_serial_number": hesabat.work_plan_serial_number,
-                        "activity_type_name": ((
-                            await db.execute(
-                                select(Activity)
-                                .where(Activity.activity_type_code == int(hesabat.activity_type_code))
-                            )
-                        )).scalar_one_or_none().activity_type_name,
-                        "activity_doc_path": f"/static/report/{hesabat.work_plan_serial_number}/{os.path.basename(hesabat.activity_doc_path)}" if hesabat.activity_doc_path else None,
-                        "done_percentage": hesabat.done_percentage, 
-                        "work_year": ((
-                            await db.execute(
-                                select(Plan)
-                                .where(Plan.work_plan_serial_number == hesabat.work_plan_serial_number)
-                            )
-                        )).scalar_one_or_none().work_year,
-                        "assessment_score": hesabat.assessment_score,
-                        "admin_assessment": hesabat.admin_assessment,
-                        "activity_type_code": hesabat.activity_type_code,
-                        "ai_assessment": hesabat.ai_assessment,
-                        "submitted_at": hesabat.submitted_at.isoformat() if hesabat.submitted_at else None,
-                        "duration_analysis": hesabat.duration_analysis,
-                        "note": hesabat.note,
-                        "submitted": hesabat.submitted,
-                        "done": hesabat.done
-                    } for hesabat in hesabats
-                ]
+                "hesabats": grouped_list
             }
         )
-    
+
     except Exception as e:
         return JSONResponse(
-            content={
-                "error": str(e)
-            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            content={"error": str(e)},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 # Done hesabat
@@ -113,9 +119,9 @@ async def done_hesabat(
             .where(Hesabat.work_plan_serial_number == work_plan_serial_number)
         )
 
-        hesabat = result.scalar_one_or_none()
+        hesabat_list = result.scalars().all()
 
-        if not hesabat:
+        if not hesabat_list:
             return JSONResponse(
                 content={
                     "statusCode": 404,
@@ -123,24 +129,30 @@ async def done_hesabat(
                 }, status_code=status.HTTP_404_NOT_FOUND
             )
         
-        if not hesabat.admin_assessment or not hesabat.assessment_score:
-            return JSONResponse(
-                content={
-                    "statusCode": 409,
-                    "message": "Hesabat not found"
-                }, status_code=status.HTTP_409_CONFLICT
-            )
+        # Check that all rows have admin_assessment and assessment_score
+        for hesabat in hesabat_list:
+            if hesabat.admin_assessment is None or hesabat.assessment_score is None:
+                return JSONResponse(
+                    content={
+                        "statusCode": 409,
+                        "message": "Hesabat is not fully assessed"
+                    }, status_code=status.HTTP_409_CONFLICT
+                )
         
-        hesabat.done = True
-        hesabat.done_at = datetime.utcnow()
+        # Update done status for all rows
+        now = datetime.utcnow()
+        for hesabat in hesabat_list:
+            hesabat.done = True
+            hesabat.done_at = now
 
         await db.commit()
-        await db.refresh(hesabat)
+        for hesabat in hesabat_list:
+            await db.refresh(hesabat)
 
         return JSONResponse(
             content={
                 "statusCode": 200,
-                "message": "Hesabat done successfully"
+                "message": "Hesabat marked as done successfully for all activities"
             }, status_code=status.HTTP_200_OK
         )
     
@@ -182,7 +194,7 @@ async def submit_hesabat(
             .where(Plan.work_plan_serial_number == form_data.work_plan_serial_number)
         )
 
-        exist_plan = fetched_plan.scalar_one_or_none()
+        exist_plan = fetched_plan.scalars().first()
 
         if not exist_plan:
             return JSONResponse(
@@ -206,26 +218,9 @@ async def submit_hesabat(
             .where(Hesabat.work_plan_serial_number == form_data.work_plan_serial_number)
         )
 
-        existing_hesabat = fetched_hesabat.scalar_one_or_none()
+        hesabat_list = fetched_hesabat.scalars().all()
 
-        if existing_hesabat:
-            existing_hesabat.activity_doc_path = file_path
-            existing_hesabat.done_percentage = form_data.done_percentage
-            existing_hesabat.assessment_score = form_data.assessment_score
-            existing_hesabat.submitted = True
-            existing_hesabat.submitted_at = datetime.utcnow()
-            existing_hesabat.duration_analysis = duration_analysis
-
-            await db.commit()
-            await db.refresh(existing_hesabat)
-
-            return JSONResponse(
-                content={
-                    "statusCode": 200,
-                    "message": "Hesabat updated successfully."
-                }, status_code=status.HTTP_200_OK
-            )
-        else:
+        if not hesabat_list:
             return JSONResponse(
                 content={
                     "statusCode": 404,
@@ -233,10 +228,29 @@ async def submit_hesabat(
                 }, status_code=status.HTTP_404_NOT_FOUND
             )
 
-    except Exception as e:
+        for existing_hesabat in hesabat_list:
+            existing_hesabat.activity_doc_path = file_path
+            existing_hesabat.done_percentage = form_data.done_percentage
+            existing_hesabat.assessment_score = form_data.assessment_score
+            existing_hesabat.submitted = True
+            existing_hesabat.submitted_at = datetime.utcnow()
+            existing_hesabat.duration_analysis = duration_analysis
+
+        await db.commit()
+
         return JSONResponse(
             content={
-                "error": str(e)
+                "statusCode": 200,
+                "message": "Hesabat updated successfully."
+            }, status_code=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        logger.exception("Error in submit_hesabat")
+        return JSONResponse(
+            content={
+                "error": str(e),
+                "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -282,20 +296,18 @@ async def delete_hesabat(
 # Get a single hesabat by fin kod
 
 async def get_hesabat_by_fin_kod(
-        fin_kod: str,
-        db: AsyncSession = Depends(get_db),
-        start: int = Query(..., ge=0),
-        end: int = Query(..., ge=1),
+    fin_kod: str,
+    start: int = Query(..., ge=0),
+    end: int = Query(..., ge=1),
+    db: AsyncSession = Depends(get_db)
 ):
     try:
         fetched_hesabats = await db.execute(
             select(Hesabat)
             .where(Hesabat.fin_kod == fin_kod)
+            .order_by(Hesabat.work_plan_serial_number, Hesabat.activity_type_code)
         )
-
         hesabats = fetched_hesabats.scalars().all()
-
-        paginated_hesabats = hesabats[start:end]
 
         if not hesabats:
             return JSONResponse(
@@ -303,106 +315,146 @@ async def get_hesabat_by_fin_kod(
                     "statusCode": 404,
                     "message": "No hesabat found."
                 }, status_code=status.HTTP_404_NOT_FOUND
-        )
+            )
 
-        hesabat_list = []
-        for hesabat in paginated_hesabats:
+        grouped = {}
+        for hesabat in hesabats:
+            key = hesabat.work_plan_serial_number
+
+            if key not in grouped:
+                grouped[key] = {
+                    "fin_kod": hesabat.fin_kod,
+                    "work_plan_serial_number": hesabat.work_plan_serial_number,
+                    "activity_type_names": [],
+                    "activity_doc_path": hesabat.activity_doc_path,
+                    "done_percentage": hesabat.done_percentage,
+                    "assessment_score": hesabat.assessment_score,
+                    "admin_assessment": hesabat.admin_assessment,
+                    "ai_assessment": hesabat.ai_assessment,
+                    "submitted_at": hesabat.submitted_at.isoformat() if hesabat.submitted_at else None,
+                    "duration_analysis": hesabat.duration_analysis,
+                    "note": hesabat.note,
+                    "submitted": hesabat.submitted
+                }
+
             activity_name_result = await db.execute(
                 select(Activity.activity_type_name)
                 .where(Activity.activity_type_code == int(hesabat.activity_type_code))
             )
             activity_type_name = activity_name_result.scalar_one_or_none() or "Unknown"
-            hesabat_list.append({
-                "fin_kod": hesabat.fin_kod,
-                "work_plan_serial_number": hesabat.work_plan_serial_number,
-                "activity_doc_path": hesabat.activity_doc_path,
-                "done_percentage": hesabat.done_percentage,
-                "assessment_score": hesabat.assessment_score,
-                "admin_assessment": hesabat.admin_assessment,
-                "activity_type_code": hesabat.activity_type_code,
-                "activity_type_name": activity_type_name, 
-                "ai_assessment": hesabat.ai_assessment,
-                "submitted_at": hesabat.submitted_at.isoformat() if hesabat.submitted_at else None,
-                "duration_analysis": hesabat.duration_analysis,
-                "note": hesabat.note,
-                "submitted": hesabat.submitted
-            })
+            grouped[key]["activity_type_names"].append(activity_type_name)
+
+        grouped_list = sorted(grouped.values(), key=lambda x: x["work_plan_serial_number"])
+        grouped_list = grouped_list[start:end]
 
         return JSONResponse(
             content={
                 "statusCode": 200,
                 "message": "Hesabat fetched successfully.",
-                "hesabat_count": len(hesabats),
-                "hesabats": hesabat_list
+                "hesabat_count": len(grouped),
+                "hesabats": grouped_list
             }, status_code=status.HTTP_200_OK
         )
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": str(e),
+                "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 # Get single hesabat by serial number
+
+from sqlalchemy import select
+from fastapi import Depends, status
+from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+import os
 
 async def get_hesabat_by_serial_number(
         serial_number: str,
         db: AsyncSession = Depends(get_db)
 ):
     try:
+        # Fetch all hesabat rows with the given serial number
         fetched_hesabat = await db.execute(
-            select(Hesabat)
-            .where(Hesabat.work_plan_serial_number == serial_number)
+            select(Hesabat).where(Hesabat.work_plan_serial_number == serial_number)
         )
+        hesabat_list = fetched_hesabat.scalars().all()
 
-        hesabat = fetched_hesabat.scalar_one_or_none()
-
-        if not hesabat:
+        if not hesabat_list:
             return JSONResponse(
                 content={
                     "statusCode": 404,
                     "message": "No hesabat found."
                 }, status_code=status.HTTP_404_NOT_FOUND
             )
-        
-        activity_name_result = await db.execute(
-            select(Activity.activity_type_name)
-            .where(Activity.activity_type_code == int(hesabat.activity_type_code))
-        )
-        activity_type_name = activity_name_result.scalar_one_or_none() or "Unknown"
 
-        doc_name = os.path.basename(hesabat.activity_doc_path) if hesabat.activity_doc_path else None
+        activity_codes = [
+            int(h.activity_type_code)
+            for h in hesabat_list
+            if h.activity_type_code is not None
+        ]
+
+        activity_map = {}
+        if activity_codes:
+            activity_name_result = await db.execute(
+                select(Activity.activity_type_code, Activity.activity_type_name)
+                .where(Activity.activity_type_code.in_(activity_codes))
+            )
+            activity_map = {row[0]: row[1] for row in activity_name_result.all()}
+
+        grouped = {}
+        for hesabat in hesabat_list:
+            key = hesabat.work_plan_serial_number
+
+            if key not in grouped:
+                doc_name = os.path.basename(hesabat.activity_doc_path) if hesabat.activity_doc_path else None
+                grouped[key] = {
+                    "fin_kod": hesabat.fin_kod,
+                    "work_plan_serial_number": hesabat.work_plan_serial_number,
+                    "doc_name": doc_name,
+                    "work_desc": ((await db.execute(
+                        select(Plan)
+                        .where(Plan.work_plan_serial_number == hesabat.work_plan_serial_number)
+                    ))).scalars().all()[0].work_desc,
+                    "activity_doc_path": f"/static/report/{hesabat.work_plan_serial_number}/{os.path.basename(hesabat.activity_doc_path)}"
+                                         if hesabat.activity_doc_path else None,
+                    "done_percentage": hesabat.done_percentage,
+                    "assessment_score": hesabat.assessment_score,
+                    "admin_assessment": hesabat.admin_assessment,
+                    "activity_type_codes": [],
+                    "activity_type_names": [],
+                    "ai_assessment": hesabat.ai_assessment,
+                    "submitted_at": hesabat.submitted_at.isoformat() if hesabat.submitted_at else None,
+                    "duration_analysis": hesabat.duration_analysis,
+                    "note": hesabat.note,
+                    "submitted": hesabat.submitted
+                }
+
+            code_int = int(hesabat.activity_type_code) if hesabat.activity_type_code is not None else None
+            grouped[key]["activity_type_codes"].append(code_int)
+            grouped[key]["activity_type_names"].append(activity_map.get(code_int, "Unknown"))
+
+        hesabat_response = list(grouped.values())
 
         return JSONResponse(
             content={
                 "statusCode": 200,
                 "message": "Hesabat fetched successfully.",
-                "hesabat": {
-                        "fin_kod": hesabat.fin_kod,
-                        "work_plan_serial_number": hesabat.work_plan_serial_number,
-                        "doc_name": doc_name,
-                        "activity_doc_path": f"/static/report/{hesabat.work_plan_serial_number}/{os.path.basename(hesabat.activity_doc_path)}" if hesabat.activity_doc_path else None,
-                        "done_percentage": hesabat.done_percentage,
-                        "assessment_score": hesabat.assessment_score,
-                        "admin_assessment": hesabat.admin_assessment,
-                        "activity_type_code": hesabat.activity_type_code,
-                        "activity_type_name": activity_type_name,
-                        "ai_assessment": hesabat.ai_assessment,
-                        "submitted_at": hesabat.submitted_at.isoformat() if hesabat.submitted_at else None,
-                        "duration_analysis": hesabat.duration_analysis,
-                        "note": hesabat.note,
-                        "submitted": hesabat.submitted
-                    }
+                "hesabat": hesabat_response
             }, status_code=status.HTTP_200_OK
         )
-    
+
     except Exception as e:
         return JSONResponse(
             content={
                 "error": str(e),
                 "statusCode": 500
-            }, status_code=status.HTTP_500
+            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 # Get single hesabat document by serial number
@@ -461,9 +513,9 @@ async def add_assessment(
             .where(Hesabat.work_plan_serial_number == assessment_data.work_plan_serial_number)
         )
 
-        hesabat = fetched_hesabat.scalar_one_or_none()
+        hesabat_list = fetched_hesabat.scalars().all()
 
-        if not hesabat:
+        if not hesabat_list:
             return JSONResponse(
                 content={
                     "statusCode": 404,
@@ -471,15 +523,17 @@ async def add_assessment(
                 }, status_code=status.HTTP_404_NOT_FOUND
             )
         
-        if not hesabat.activity_doc_path or not hesabat.done_percentage or not hesabat.assessment_score or not hesabat.submitted:
-            return JSONResponse(
-                content={
-                    "statusCode": 409,
-                    "message": "Hesabat is not submitted"
-                }, status_code=status.HTTP_409_CONFLICT
-            )
+        # Check that all hesabat rows are submitted
+        for hesabat in hesabat_list:
+            if not hesabat.activity_doc_path or not hesabat.done_percentage or not hesabat.assessment_score or not hesabat.submitted:
+                return JSONResponse(
+                    content={
+                        "statusCode": 409,
+                        "message": "Hesabat is not submitted"
+                    }, status_code=status.HTTP_409_CONFLICT
+                )
         
-        if assessment_data.admin_assessment_score < 0 or assessment_data.admin_assessment_score > 100 :
+        if assessment_data.admin_assessment_score < 0 or assessment_data.admin_assessment_score > 100:
             return JSONResponse(
                 content={
                     "statusCode": 400,
@@ -487,15 +541,18 @@ async def add_assessment(
                 }, status_code=status.HTTP_400_BAD_REQUEST
             )
         
-        hesabat.admin_assessment = assessment_data.admin_assessment_score
+        # Update admin_assessment for all rows
+        for hesabat in hesabat_list:
+            hesabat.admin_assessment = assessment_data.admin_assessment_score
 
         await db.commit()
-        await db.refresh(hesabat)
+        for hesabat in hesabat_list:
+            await db.refresh(hesabat)
 
         return JSONResponse(
             content={
                 "statusCode": 200,
-                "message": "Assessment added successfully"
+                "message": "Assessment added successfully for all activities"
             }
         )
     
@@ -519,9 +576,9 @@ async def update_assessment(
             .where(Hesabat.work_plan_serial_number == assessment_data.work_plan_serial_number)
         )
 
-        hesabat = result.scalar_one_or_none()
+        hesabat_list = result.scalars().all()
 
-        if not hesabat:
+        if not hesabat_list:
             return JSONResponse(
                 content={
                     "statusCode": 404,
@@ -529,15 +586,17 @@ async def update_assessment(
                 }, status_code=status.HTTP_404_NOT_FOUND
             )
         
-        hesabat.admin_assessment = assessment_data.admin_assessment_score
+        for hesabat in hesabat_list:
+            hesabat.admin_assessment = assessment_data.admin_assessment_score
 
         await db.commit()
-        await db.refresh(hesabat)
+        for hesabat in hesabat_list:
+            await db.refresh(hesabat)
 
         return JSONResponse(
             content={
                 "statusCode": 200,
-                "message": "Assessment score updated successfully"
+                "message": "Assessment score updated successfully for all activities"
             }, status_code=status.HTTP_200_OK
         )
     
@@ -560,71 +619,72 @@ async def get_archive(
         result = await db.execute(
             select(Hesabat)
             .where(Hesabat.done == True)
-            .offset(start)
-            .limit(end-start)
+            .order_by(Hesabat.work_plan_serial_number, Hesabat.activity_type_code)
         )
 
         archive_hesabats = result.scalars().all()
 
         count_result = await db.execute(
-            select(func.count())
-            .select_from(Hesabat)
-            .where(Hesabat.done == True)
+            select(func.count()).select_from(Hesabat).where(Hesabat.done == True)
         )
-        
         total_hesabats = count_result.scalar()
 
         if not archive_hesabats:
             return JSONResponse(
-                content={
-                    "statusCode": 204,
-                    "message":  "No content"
-                }, status_code=status.HTTP_204_NO_CONTENT
+                content={"statusCode": 204, "message": "No content"},
+                status_code=status.HTTP_204_NO_CONTENT
             )
-        
+
+        # Collect unique fin_kods and activity codes
+        fin_kods = {h.fin_kod for h in archive_hesabats}
+        activity_codes = {int(h.activity_type_code) for h in archive_hesabats if h.activity_type_code is not None}
+
+        # Fetch all users
+        users_result = await db.execute(select(User).where(User.fin_kod.in_(fin_kods)))
+        users = users_result.scalars().all()
+        user_map = {u.fin_kod: u for u in users}
+
+        # Fetch all activities
+        activities_result = await db.execute(select(Activity.activity_type_code, Activity.activity_type_name).where(Activity.activity_type_code.in_(activity_codes)))
+        activities = activities_result.all()
+        activity_map = {int(code): name for code, name in activities}
+
+        grouped = {}
+        for hesabat in archive_hesabats:
+            key = hesabat.work_plan_serial_number
+            if key not in grouped:
+                user = user_map.get(hesabat.fin_kod)
+                grouped[key] = {
+                    "fin_kod": hesabat.fin_kod,
+                    "name": user.name if user else None,
+                    "surname": user.surname if user else None,
+                    "father_name": user.father_name if user else None,
+                    "work_plan_serial_number": hesabat.work_plan_serial_number,
+                    "activity_type_codes": [],
+                    "activity_type_names": [],
+                    "assessment_score": hesabat.assessment_score,
+                    "done_percentage": hesabat.done_percentage,
+                    "admin_assessment": hesabat.admin_assessment,
+                    "ai_assessment": hesabat.ai_assessment,
+                }
+
+            code_int = int(hesabat.activity_type_code) if hesabat.activity_type_code is not None else None
+            grouped[key]["activity_type_codes"].append(code_int)
+            grouped[key]["activity_type_names"].append(activity_map.get(code_int, "Unknown"))
+
+        grouped_list = list(grouped.values())[start:end]
+
         return JSONResponse(
             content={
                 "statusCode": 200,
                 "message": "Archive fetched successfully.",
                 "archive_count": total_hesabats,
-                "archive": [
-                    {
-                        "fin_kod": hesabat.fin_kod,
-                        "name": ((
-                            await db.execute(
-                                select(User)
-                                .where(User.fin_kod == hesabat.fin_kod)
-                            )
-                        )).scalar_one_or_none().name,
-                        "surname": ((
-                            await db.execute(
-                                select(User)
-                                .where(User.fin_kod == hesabat.fin_kod)
-                            )
-                        )).scalar_one_or_none().surname,
-                        "father_name": ((
-                            await db.execute(
-                                select(User)
-                                .where(User.fin_kod == hesabat.fin_kod)
-                            )
-                        )).scalar_one_or_none().father_name,
-                        "work_plan_serial_number": hesabat.work_plan_serial_number,
-                        "assessment_score": hesabat.assessment_score,
-                        "done_percentage": hesabat.done_percentage,
-                        "admin_assessment": hesabat.admin_assessment,
-                        "ai_assessment": hesabat.ai_assessment,
-                        "activity_type_name": ((await db.execute(
-                            select(Activity)
-                            .where(Activity.activity_type_code == int(hesabat.activity_type_code))
-                        ))).scalar_one_or_none().activity_type_name
-                    } for hesabat in archive_hesabats
-                ]
+                "archive": grouped_list
             }
         )
+
     except Exception as e:
         return JSONResponse(
-            content={
-                "error": str(e),
-                "statusCode": 500
-            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            content={"error": str(e), "statusCode": 500},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

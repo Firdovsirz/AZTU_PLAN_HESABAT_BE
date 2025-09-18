@@ -3,7 +3,8 @@ from sqlalchemy import (
     Column,
     Integer,
     String,
-    DateTime
+    DateTime,
+    Boolean
 )
 from app.db.database import Base
 
@@ -19,3 +20,5 @@ class Activity(Base):
     activity_type_name = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime)
+    approved = Column(Boolean, nullable=False, default=False)
+    fin_kod = Column(String)
