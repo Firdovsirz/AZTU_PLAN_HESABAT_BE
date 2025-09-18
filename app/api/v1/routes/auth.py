@@ -11,7 +11,7 @@ from app.api.v1.schemas.auth_schema import AuthCreate, Signin, ResetPassword
 router = APIRouter()
 
 @router.get("/app-wait-users/{start}/{end}")
-@limiter.limit("10/second")
+@limiter.limit("30/second")
 async def get_app_wait_users_end(
     request: Request,
     start: int,

@@ -13,19 +13,19 @@ router = APIRouter()
 bearer_scheme = HTTPBearer()
 
 @router.get("/submitted-hesabats/{start}/{end}")
-@limiter.limit("10/minute")
+@limiter.limit("100/second")
 async def submitted_hesabats_endpoint(
     request: Request,
     start: int,
     end: int,
     db: AsyncSession = Depends(get_db),
-    # _current_user=Depends(token_required([0, 1])),
+    _current_user=Depends(token_required([0, 1])),
     # swagger_token: str = Security(bearer_scheme)
 ):
     return await submitted_hesabats(db, start, end)
 
 @router.get("/hesabat/{fin_kod}/{start}/{end}")
-@limiter.limit("10/minute")
+@limiter.limit("100/second")
 async def get_hesabat_by_fin_kod_endpoint(
     request: Request,
     fin_kod:  Annotated[str, Path(..., description="Fin Kod")],
@@ -37,7 +37,7 @@ async def get_hesabat_by_fin_kod_endpoint(
     return await get_hesabat_by_fin_kod(fin_kod, start, end, db)
 
 @router.get("/hesabat/plan/{serial_number}")
-@limiter.limit("50/minute")
+@limiter.limit("100/second")
 async def get_hesabat_by_fin_kod_endpoint(
     request: Request,
     serial_number:  Annotated[str, Path(..., description="Serial Number")],
@@ -48,7 +48,7 @@ async def get_hesabat_by_fin_kod_endpoint(
 
 
 @router.get("/doc/{work_plan_serial_number}/{doc_name}")
-@limiter.limit("50/minute")
+@limiter.limit("100/second")
 async def get_doc_endpoint(
     request: Request,
     serial_number: Annotated[str, Path(..., description="Work Serial Number")],
@@ -78,7 +78,7 @@ async def done_hesabat_endpoint(
     return await done_hesabat(work_plan_serial_number, db)
 
 @router.post("/submit-hesabat")
-@limiter.limit("50/minute")
+@limiter.limit("50/second")
 async def submit_hesabat_endpoint(
     request: Request,
     form_data: CreateHesabat = Depends(CreateHesabat.as_form),
@@ -88,7 +88,7 @@ async def submit_hesabat_endpoint(
     return await submit_hesabat(form_data, db)
 
 @router.post("/hesabat/assessment")
-@limiter.limit("10/minute")
+@limiter.limit("30/second")
 async def set_assessment(
     request: Request,
     assessment_data: SetAssessmentSchema,
@@ -98,7 +98,7 @@ async def set_assessment(
     return await add_assessment(assessment_data, db)
 
 @router.patch("/hesabat/assessment/update")
-@limiter.limit("10/minute")
+@limiter.limit("50/seconde")
 async def update_assessment_endpoint(
     request: Request,
     assessment_data: UpdateAssessmentScore,
@@ -108,7 +108,7 @@ async def update_assessment_endpoint(
     return await update_assessment(assessment_data, db)
 
 @router.delete("/hesabat/{work_plan_serial_number}/delete")
-@limiter.limit("10/minute")
+@limiter.limit("50/second")
 async def delete_hesabat_endpoint(
     request: Request,
     work_plan_serial_number: str,

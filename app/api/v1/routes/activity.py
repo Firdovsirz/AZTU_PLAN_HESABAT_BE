@@ -10,7 +10,7 @@ from app.utils.limiter import limiter, register_limiter
 router = APIRouter()
 
 @router.get("/activities/{fin_kod}")
-@limiter.limit("30/second")
+@limiter.limit("50/second")
 async def get_activity_endpoint(
     request: Request,
     fin_kod: str,
@@ -20,7 +20,7 @@ async def get_activity_endpoint(
     return await get_activity(fin_kod, db)
 
 @router.get("/activity/{activity_type_code}")
-@limiter.limit("30/second")
+@limiter.limit("50/second")
 async def get_act_by_code_endpoint(
     request: Request,
     activity_type_code: int =  Annotated[int, Path(..., description="Activity Code")],
@@ -36,7 +36,7 @@ async def add_activity_endpoint(
     activity_name: str =  Annotated[str, Path(..., description="Activity Name")],
     fin_kod: str = Annotated[str, Path(..., description="Fin kod")],
     db: AsyncSession = Depends(get_db),
-    # _current_user=Depends(token_required([0, 1, 2, 3, 4]))
+    _current_user=Depends(token_required([0, 1, 2, 3, 4]))
 ):
     return await create_activity(activity_name, fin_kod, db)
 
