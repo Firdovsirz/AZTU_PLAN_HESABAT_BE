@@ -13,10 +13,11 @@ router = APIRouter()
 @limiter.limit("50/minute")
 async def get_duties_endpoint(
     request: Request,
+    org_type: str | None = Query(None, description="faculty | department"),
     db: Session = Depends(get_db),
     # _current_user=Depends(token_required([0, 1, 2, 3, 4]))
 ):
-    return await get_duties(db)
+    return await get_duties(db, org_type)
 
 @router.get("/duty/{duty_code}")
 @limiter.limit("50/minute")
@@ -33,10 +34,23 @@ async def get_duty_by_code_endpoint(
 async def add_duty_endpoint(
     request: Request,
     duty_name: str = Query(..., description="Name of the duty"),
+    org_type: str = Query("faculty", description="faculty | department"),
     db: Session = Depends(get_db),
     _current_user=Depends(token_required([0, 1]))
 ):
-    return await create_duty(duty_name, db)
+    return await create_duty(duty_name, db, org_type)
+
+@router.put("/update/duty/{duty_code}/{duty_name}")
+@limiter.limit("30/minute")
+async def update_duty_endpoint(
+    request: Request,
+    duty_code: Annotated[int, Path(..., description="Duty Code")],
+    duty_name: Annotated[str, Path(..., description="Duty Name")],
+    org_type: str | None = Query(None, description="faculty | department"),
+    db: Session = Depends(get_db),
+    _current_user=Depends(token_required([1]))
+):
+    return await update_duty(duty_code, duty_name, db, org_type)
 
 @router.delete("/delete/duty/{duty_code}")
 @limiter.limit("1/minute")

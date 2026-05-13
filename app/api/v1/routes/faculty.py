@@ -28,6 +28,27 @@ async def get_faculties(
 ):
     return await get_faculties_from_local(db)
 
+@router.put("/update/faculty/{faculty_code}/{faculty_name}")
+@limiter.limit("30/minute")
+async def update_faculty_endpoint(
+    request: Request,
+    faculty_code: Annotated[str, Path(..., description="Faculty Code")],
+    faculty_name: Annotated[str, Path(..., description="Faculty Name")],
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([1]))
+):
+    return await update_faculty_name(faculty_code, faculty_name, db)
+
+@router.delete("/delete/faculty/{faculty_code}")
+@limiter.limit("30/minute")
+async def delete_faculty_endpoint(
+    request: Request,
+    faculty_code: Annotated[str, Path(..., description="Faculty Code")],
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([1]))
+):
+    return await delete_faculty(faculty_code, db)
+
 @router.get("/faculties/{faculty_code}")
 @limiter.limit("50/minute")
 async def get_fac_name_endpoint(

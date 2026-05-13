@@ -71,6 +71,7 @@ async def signup(
             father_name=form_data.father_name,
             faculty_code=form_data.faculty_code if form_data.faculty_code else None,
             cafedra_code=getattr(form_data, "cafedra_code", None),
+            department_code=getattr(form_data, "department_code", None),
             duty_code=form_data.duty_code if form_data.duty_code else None,
             is_execution=False,
             created_at=datetime.utcnow(),

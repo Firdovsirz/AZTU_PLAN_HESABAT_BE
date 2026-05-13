@@ -17,4 +17,5 @@ class Duty(Base):
     id = Column(Integer, primary_key=True, index=True)
     duty_code = Column(Integer, nullable=False, unique=True)
     duty_name = Column(String, nullable=False, unique=True)
+    org_type = Column(String, nullable=False, default="faculty")
     created_at = Column(DateTime, nullable=False)

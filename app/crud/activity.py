@@ -167,6 +167,67 @@ async def get_activity_name_by_code(
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+async def update_activity(
+    activity_code: int,
+    activity_type_name: str,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        fetched_activity = await db.execute(
+            select(Activity)
+            .where(Activity.activity_type_code == int(activity_code))
+        )
+
+        exist_activity = fetched_activity.scalar_one_or_none()
+
+        if not exist_activity:
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "Activity not found."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        fetched_name = await db.execute(
+            select(Activity)
+            .where(
+                Activity.activity_type_name == activity_type_name,
+                Activity.activity_type_code != int(activity_code)
+            )
+        )
+        name_conflict = fetched_name.scalar_one_or_none()
+
+        if name_conflict:
+            return JSONResponse(
+                content={
+                    "statusCode": 409,
+                    "message": "Name already exist."
+                }, status_code=status.HTTP_409_CONFLICT
+            )
+
+        exist_activity.activity_type_name = activity_type_name
+        exist_activity.updated_at = datetime.utcnow()
+
+        await db.commit()
+        await db.refresh(exist_activity)
+
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Activity updated successfully.",
+                "activity_type_code": exist_activity.activity_type_code,
+                "activity_type_name": exist_activity.activity_type_name
+            }, status_code=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        logger.exception("Error while updating activity")
+        return JSONResponse(
+            content={
+                "error": str(e)
+            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 async def delete_activity(
     activity_code: int,
     db: AsyncSession = Depends(get_db)
@@ -184,7 +245,7 @@ async def delete_activity(
                 content={
                     "statusCode": 404,
                     "message": "Activity not found."
-                }, status_code=status.HTPP_404
+                }, status_code=status.HTTP_404_NOT_FOUND
             )
         
         await db.delete(exist_activity)

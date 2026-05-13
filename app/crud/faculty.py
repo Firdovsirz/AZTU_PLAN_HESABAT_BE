@@ -109,6 +109,92 @@ async def get_faculties_from_lms(db: AsyncSession = Depends(get_db)):
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
+async def update_faculty_name(
+    faculty_code: str,
+    faculty_name: str,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        fetched = await db.execute(
+            select(Faculty).where(Faculty.faculty_code == faculty_code)
+        )
+        existing = fetched.scalar_one_or_none()
+
+        if not existing:
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "Faculty not found."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        name_conflict = await db.execute(
+            select(Faculty).where(
+                Faculty.faculty_name == faculty_name,
+                Faculty.faculty_code != faculty_code
+            )
+        )
+        if name_conflict.scalar_one_or_none():
+            return JSONResponse(
+                content={
+                    "statusCode": 409,
+                    "message": "Name already exist."
+                }, status_code=status.HTTP_409_CONFLICT
+            )
+
+        existing.faculty_name = faculty_name
+        await db.commit()
+        await db.refresh(existing)
+
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Faculty updated successfully.",
+                "faculty_code": existing.faculty_code,
+                "faculty_name": existing.faculty_name
+            }, status_code=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+async def delete_faculty(
+    faculty_code: str,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        fetched = await db.execute(
+            select(Faculty).where(Faculty.faculty_code == faculty_code)
+        )
+        existing = fetched.scalar_one_or_none()
+
+        if not existing:
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "Faculty not found."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        await db.delete(existing)
+        await db.commit()
+
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Faculty deleted successfully."
+            }, status_code=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 async def get_faculties_from_local(db: AsyncSession = Depends(get_db)):
     try:
         fetched_faculties = await db.execute(

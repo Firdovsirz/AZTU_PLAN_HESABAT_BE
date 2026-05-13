@@ -18,6 +18,7 @@ class AuthCreate(BaseModel):
     father_name: str = Form(...)
     faculty_code: Optional[str] = Form(None)
     cafedra_code: Optional[str] = Form(None)
+    department_code: Optional[str] = Form(None)
 
     @classmethod
     def as_form(
@@ -32,6 +33,7 @@ class AuthCreate(BaseModel):
         father_name: str = Form(...),
         faculty_code: Optional[str] = Form(None),
         cafedra_code: Optional[str] = Form(None),
+        department_code: Optional[str] = Form(None),
     ) -> "AuthCreate":
         return cls(
             fin_kod=fin_kod,
@@ -44,6 +46,7 @@ class AuthCreate(BaseModel):
             father_name=father_name,
             faculty_code=faculty_code,
             cafedra_code=cafedra_code,
+            department_code=department_code,
         )
 
 class Signin(BaseModel):

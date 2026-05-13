@@ -237,3 +237,75 @@ async def cafedra_users(
                 "error": str(e)
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+async def update_cafedra_name(
+    cafedra_code: str,
+    cafedra_name: str,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        fetched = await db.execute(
+            select(Cafedra).where(Cafedra.cafedra_code == cafedra_code)
+        )
+        existing = fetched.scalar_one_or_none()
+
+        if not existing:
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "Cafedra not found."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        existing.cafedra_name = cafedra_name
+        await db.commit()
+        await db.refresh(existing)
+
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Cafedra updated successfully.",
+                "cafedra_code": existing.cafedra_code,
+                "cafedra_name": existing.cafedra_name
+            }, status_code=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+async def delete_cafedra(
+    cafedra_code: str,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        fetched = await db.execute(
+            select(Cafedra).where(Cafedra.cafedra_code == cafedra_code)
+        )
+        existing = fetched.scalar_one_or_none()
+
+        if not existing:
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "Cafedra not found."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        await db.delete(existing)
+        await db.commit()
+
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Cafedra deleted successfully."
+            }, status_code=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

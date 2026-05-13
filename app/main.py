@@ -20,7 +20,8 @@ from app.api.v1.routes import (
     cafedra,
     hesabat,
     activity,
-    assessment
+    assessment,
+    department
 )
 
 app = FastAPI(
@@ -51,6 +52,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
 app.include_router(faculty.router, prefix="/api", tags=["Faculty"])
 app.include_router(cafedra.router, prefix="/api", tags=["Cafedra"])
+app.include_router(department.router, prefix="/api", tags=["Department"])
 app.include_router(duty.router, prefix="/api", tags=["Duty"])
 app.include_router(activity.router, prefix="/api", tags=["Activity"])
 app.include_router(assessment.router, prefix="/api", tags=["Assessment"])

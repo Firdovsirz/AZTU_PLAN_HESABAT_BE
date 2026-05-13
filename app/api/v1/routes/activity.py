@@ -36,17 +36,27 @@ async def add_activity_endpoint(
     activity_name: str =  Annotated[str, Path(..., description="Activity Name")],
     fin_kod: str = Annotated[str, Path(..., description="Fin kod")],
     db: AsyncSession = Depends(get_db),
-    _current_user=Depends(token_required([0, 1, 2, 3, 4]))
+    _current_user=Depends(token_required([1]))
 ):
     return await create_activity(activity_name, fin_kod, db)
 
-@token_required([0, 1])
+@router.put("/update/activity/{activity_code}/{activity_name}")
 @limiter.limit("30/second")
+async def update_activity_endpoint(
+    request: Request,
+    activity_code: int = Annotated[int, Path(..., description="Activity Code")],
+    activity_name: str = Annotated[str, Path(..., description="Activity Name")],
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([1]))
+):
+    return await update_activity(activity_code, activity_name, db)
+
 @router.delete("/delete/activity/{activity_code}")
+@limiter.limit("30/second")
 async def delete_act_endpoint(
     request: Request,
     activity_code: int =  Annotated[int, Path(..., description="Activity Code")],
     db: AsyncSession = Depends(get_db),
-    _current_user=Depends(token_required([0, 1]))
+    _current_user=Depends(token_required([1]))
 ):
     return await delete_activity(activity_code, db)

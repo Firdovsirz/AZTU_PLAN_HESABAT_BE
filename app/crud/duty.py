@@ -9,7 +9,8 @@ from app.api.v1.schemas.duty_schema import CreateDuty
 
 async def create_duty(
         duty_name: str,
-        db: AsyncSession = Depends(get_db)
+        db: AsyncSession = Depends(get_db),
+        org_type: str = "faculty"
 ):
     try:
         fetched_name = await db.execute(
@@ -43,6 +44,7 @@ async def create_duty(
         new_duty = Duty(
             duty_code=max_duty_code+1,
             duty_name=duty_name,
+            org_type=org_type if org_type in ("faculty", "department") else "faculty",
             created_at=datetime.utcnow()
         )
 
@@ -64,11 +66,12 @@ async def create_duty(
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
         
-async def get_duties(db: AsyncSession = Depends(get_db)):
-    try: 
-        fetched_duties = await db.execute(
-            select(Duty)
-        )
+async def get_duties(db: AsyncSession = Depends(get_db), org_type: str | None = None):
+    try:
+        stmt = select(Duty)
+        if org_type in ("faculty", "department"):
+            stmt = stmt.where(Duty.org_type == org_type)
+        fetched_duties = await db.execute(stmt)
 
         duties = fetched_duties.scalars().all()
 
@@ -89,6 +92,7 @@ async def get_duties(db: AsyncSession = Depends(get_db)):
                         "id": duty.id,
                         "duty_code": duty.duty_code,
                         "duty_name": duty.duty_name,
+                        "org_type": duty.org_type,
                         "created_at": duty.created_at.isoformat()
                     } for duty in duties
                 ]
@@ -137,6 +141,62 @@ async def get_duty_by_code(
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
+async def update_duty(
+    duty_code: int,
+    duty_name: str,
+    db: AsyncSession = Depends(get_db),
+    org_type: str | None = None
+):
+    try:
+        fetched = await db.execute(
+            select(Duty).where(Duty.duty_code == int(duty_code))
+        )
+        existing = fetched.scalar_one_or_none()
+
+        if not existing:
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "Duty not found."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        name_conflict = await db.execute(
+            select(Duty).where(
+                Duty.duty_name == duty_name,
+                Duty.duty_code != int(duty_code)
+            )
+        )
+        if name_conflict.scalar_one_or_none():
+            return JSONResponse(
+                content={
+                    "statusCode": 409,
+                    "message": "Name already exist."
+                }, status_code=status.HTTP_409_CONFLICT
+            )
+
+        existing.duty_name = duty_name
+        if org_type in ("faculty", "department"):
+            existing.org_type = org_type
+        await db.commit()
+        await db.refresh(existing)
+
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Duty updated successfully.",
+                "duty_code": existing.duty_code,
+                "duty_name": existing.duty_name,
+                "org_type": existing.org_type
+            }, status_code=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 async def delete_duty(
     duty_code: int,
     db: AsyncSession = Depends(get_db)
