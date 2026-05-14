@@ -101,6 +101,72 @@ async def signup(
             "error": str(e)
         }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)   
 
+async def create_admin(
+    form_data: "AuthCreate",
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        fetched_user = await db.execute(
+            select(Auth)
+            .where(Auth.fin_kod == form_data.fin_kod)
+        )
+
+        if fetched_user.scalar_one_or_none():
+            return JSONResponse(content={
+                "statusCode": 409,
+                "message": "User already exists."
+            }, status_code=status.HTTP_409_CONFLICT)
+
+        fetched_email = await db.execute(
+            select(User)
+            .where(User.email == form_data.email)
+        )
+
+        if fetched_email.scalar_one_or_none():
+            return JSONResponse(content={
+                "statusCode": 409,
+                "message": "Email already exists."
+            }, status_code=status.HTTP_409_CONFLICT)
+
+        new_auth_user = Auth(
+            fin_kod=form_data.fin_kod,
+            role=1,
+            approved=True,
+            password=hash_password(form_data.password),
+            created_at=datetime.utcnow()
+        )
+
+        new_user = User(
+            fin_kod=form_data.fin_kod,
+            email=form_data.email,
+            name=form_data.name,
+            surname=form_data.surname,
+            father_name=form_data.father_name,
+            faculty_code=form_data.faculty_code if form_data.faculty_code else None,
+            cafedra_code=getattr(form_data, "cafedra_code", None),
+            department_code=getattr(form_data, "department_code", None),
+            duty_code=form_data.duty_code if form_data.duty_code else 1,
+            is_execution=False,
+            created_at=datetime.utcnow(),
+            approved=True
+        )
+
+        db.add(new_auth_user)
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_auth_user)
+        await db.refresh(new_user)
+
+        return JSONResponse(content={
+            "statusCode": 201,
+            "message": "Admin created successfully."
+        }, status_code=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        return JSONResponse(content={
+            "error": str(e)
+        }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 async def signin(
         credentials: Signin,
         db: AsyncSession = Depends()

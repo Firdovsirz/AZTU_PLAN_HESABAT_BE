@@ -30,6 +30,15 @@ async def signup_endpoint(
 ):
     return await signup(form_data, db)
 
+@router.post("/create-admin")
+@limiter.limit("10/minute")
+async def create_admin_endpoint(
+    request: Request,
+    form_data: Annotated[AuthCreate, Depends(AuthCreate.as_form)],
+    db: AsyncSession = Depends(get_db)
+):
+    return await create_admin(form_data, db)
+
 @router.post("/signin")
 @limiter.limit("50/minute")
 async def signin_endpoint(
