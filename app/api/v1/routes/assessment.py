@@ -11,7 +11,7 @@ from app.utils.limiter import limiter, register_limiter
 router = APIRouter()
 
 @router.get("/assessments")
-@limiter.limit("30/second")
+@limiter.limit("100/second")
 async def get_assessments_endpoint(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -20,7 +20,7 @@ async def get_assessments_endpoint(
     return await get_assessments(db)
 
 @router.get("/assessment/{assessment_score}")
-@limiter.limit("30/second")
+@limiter.limit("100/second")
 async def get_assessment(
     request: Request,
     assessment_score: Annotated[int, Path(..., description="Assessment score")],
@@ -30,7 +30,7 @@ async def get_assessment(
     return await get_assessment_by_score(assessment_score, db)
 
 @router.post("/create-assessment")
-@limiter.limit("5/minute")
+@limiter.limit("60/minute")
 async def create_assessment_endpoint(
     request: Request,
     form_data: CreateAssessment,
@@ -40,7 +40,7 @@ async def create_assessment_endpoint(
     return await create_assessment(form_data, db)
 
 @router.delete("/delete/assessment/{assessment_score}")
-@limiter.limit("5/minute")
+@limiter.limit("60/minute")
 async def del_assessment(
     request: Request,
     assessment_score: Annotated[int, Path(..., description="Assessment score")],

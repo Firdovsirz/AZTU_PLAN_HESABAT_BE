@@ -55,6 +55,54 @@ async def get_caf_details(
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+async def create_cafedra(
+    faculty_code: str,
+    cafedra_code: str,
+    cafedra_name: str,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        existing = await db.execute(
+            select(Cafedra).where(
+                (Cafedra.cafedra_code == cafedra_code) |
+                (Cafedra.cafedra_name == cafedra_name)
+            )
+        )
+        if existing.scalar_one_or_none():
+            return JSONResponse(
+                content={
+                    "statusCode": 409,
+                    "message": "Cafedra code or name already exists."
+                }, status_code=status.HTTP_409_CONFLICT
+            )
+
+        new_cafedra = Cafedra(
+            faculty_code=faculty_code,
+            cafedra_code=cafedra_code,
+            cafedra_name=cafedra_name,
+            created_at=datetime.utcnow()
+        )
+
+        db.add(new_cafedra)
+        await db.commit()
+        await db.refresh(new_cafedra)
+
+        return JSONResponse(
+            content={
+                "statusCode": 201,
+                "message": "Cafedra created successfully.",
+                "faculty_code": new_cafedra.faculty_code,
+                "cafedra_code": new_cafedra.cafedra_code,
+                "cafedra_name": new_cafedra.cafedra_name
+            }, status_code=status.HTTP_201_CREATED
+        )
+
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 async def get_cafedras_from_lms(db: AsyncSession = Depends(get_db)):
     api_url = os.getenv('LMS_API_CAFEDRAS')
     if not api_url:

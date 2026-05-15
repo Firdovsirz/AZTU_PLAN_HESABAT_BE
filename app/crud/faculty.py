@@ -43,6 +43,51 @@ async def get_fac_name(
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+async def create_faculty(
+    faculty_code: str,
+    faculty_name: str,
+    db: AsyncSession = Depends(get_db)
+):
+    try:
+        existing = await db.execute(
+            select(Faculty).where(
+                (Faculty.faculty_code == faculty_code) |
+                (Faculty.faculty_name == faculty_name)
+            )
+        )
+        if existing.scalar_one_or_none():
+            return JSONResponse(
+                content={
+                    "statusCode": 409,
+                    "message": "Faculty code or name already exists."
+                }, status_code=status.HTTP_409_CONFLICT
+            )
+
+        new_faculty = Faculty(
+            faculty_code=faculty_code,
+            faculty_name=faculty_name,
+            created_at=datetime.utcnow()
+        )
+
+        db.add(new_faculty)
+        await db.commit()
+        await db.refresh(new_faculty)
+
+        return JSONResponse(
+            content={
+                "statusCode": 201,
+                "message": "Faculty created successfully.",
+                "faculty_code": new_faculty.faculty_code,
+                "faculty_name": new_faculty.faculty_name
+            }, status_code=status.HTTP_201_CREATED
+        )
+
+    except Exception as e:
+        return JSONResponse(
+            content={"error": str(e)},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 async def get_faculties_from_lms(db: AsyncSession = Depends(get_db)):
     api_url = os.getenv('LMS_API_FACULTIES')
     if not api_url:

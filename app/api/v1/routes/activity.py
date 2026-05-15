@@ -10,7 +10,7 @@ from app.utils.limiter import limiter, register_limiter
 router = APIRouter()
 
 @router.get("/activities/{fin_kod}")
-@limiter.limit("50/second")
+@limiter.limit("200/second")
 async def get_activity_endpoint(
     request: Request,
     fin_kod: str,
@@ -20,7 +20,7 @@ async def get_activity_endpoint(
     return await get_activity(fin_kod, db)
 
 @router.get("/activity/{activity_type_code}")
-@limiter.limit("50/second")
+@limiter.limit("200/second")
 async def get_act_by_code_endpoint(
     request: Request,
     activity_type_code: int =  Annotated[int, Path(..., description="Activity Code")],
@@ -30,7 +30,7 @@ async def get_act_by_code_endpoint(
     return await get_activity_name_by_code(activity_type_code, db)
 
 @router.post("/add-activity/{activity_name}/{fin_kod}")
-@limiter.limit("100/minute")
+@limiter.limit("1000/minute")
 async def add_activity_endpoint(
     request: Request,
     activity_name: str =  Annotated[str, Path(..., description="Activity Name")],
@@ -41,7 +41,7 @@ async def add_activity_endpoint(
     return await create_activity(activity_name, fin_kod, db)
 
 @router.put("/update/activity/{activity_code}/{activity_name}")
-@limiter.limit("30/second")
+@limiter.limit("100/second")
 async def update_activity_endpoint(
     request: Request,
     activity_code: int = Annotated[int, Path(..., description="Activity Code")],
@@ -52,7 +52,7 @@ async def update_activity_endpoint(
     return await update_activity(activity_code, activity_name, db)
 
 @router.delete("/delete/activity/{activity_code}")
-@limiter.limit("30/second")
+@limiter.limit("100/second")
 async def delete_act_endpoint(
     request: Request,
     activity_code: int =  Annotated[int, Path(..., description="Activity Code")],
