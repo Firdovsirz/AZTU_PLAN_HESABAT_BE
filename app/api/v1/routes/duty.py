@@ -30,7 +30,7 @@ async def get_duty_by_code_endpoint(
     return await get_duty_by_code(duty_code, db)
 
 @router.post("/add-duty")
-@limiter.limit("1/minute")
+@limiter.limit("300/minute")
 async def add_duty_endpoint(
     request: Request,
     duty_name: str = Query(..., description="Name of the duty"),
@@ -53,7 +53,7 @@ async def update_duty_endpoint(
     return await update_duty(duty_code, duty_name, db, org_type)
 
 @router.delete("/delete/duty/{duty_code}")
-@limiter.limit("1/minute")
+@limiter.limit("300/minute")
 async def delete_duty_endpoint(
     request: Request,
     duty_code: Annotated[int, Path(..., description="Duty Code")],
