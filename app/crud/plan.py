@@ -27,41 +27,52 @@ async def all_plans(
     end: int = Query(..., ge=1)
 ):
     try:
-        fetched_plans = await db.execute(
-            select(Plan)
-            .offset(start)
-            .limit(end - start)
+        # Find serial numbers whose hesabats are NOT all done (i.e. still active)
+        done_serials_result = await db.execute(
+            select(Hesabat.work_plan_serial_number)
+            .group_by(Hesabat.work_plan_serial_number)
+            .having(func.bool_and(Hesabat.done == True))
         )
-        plans = fetched_plans.scalars().all()
+        fully_done_serials = {row for row in done_serials_result.scalars().all()}
 
-        if not plans:
+        active_serials_result = await db.execute(
+            select(Plan.work_plan_serial_number)
+            .distinct()
+            .order_by(Plan.work_plan_serial_number)
+        )
+        all_serials = [s for s in active_serials_result.scalars().all() if s not in fully_done_serials]
+
+        total_plans = len(all_serials)
+        page_serials = all_serials[start:end]
+
+        if not page_serials:
             return JSONResponse(
                 content={"statusCode": 204, "message": "No content"},
                 status_code=status.HTTP_204_NO_CONTENT
             )
 
-        fetched_total_plans = await db.execute(
-            select(func.count()).select_from(Plan)
+        fetched_plans = await db.execute(
+            select(Plan).where(Plan.work_plan_serial_number.in_(page_serials))
         )
-        total_plans = fetched_total_plans.scalar()
+        plans = fetched_plans.scalars().all()
+
+        fin_kods = {p.fin_kod for p in plans}
+        users_result = await db.execute(select(User).where(User.fin_kod.in_(fin_kods)))
+        user_map = {u.fin_kod: u for u in users_result.scalars().all()}
+
+        hesabats_result = await db.execute(
+            select(Hesabat).where(Hesabat.work_plan_serial_number.in_(page_serials))
+        )
+        hesabats_by_serial = {}
+        for h in hesabats_result.scalars().all():
+            hesabats_by_serial.setdefault(h.work_plan_serial_number, []).append(h)
 
         grouped_plans = {}
         for plan in plans:
             key = plan.work_plan_serial_number
             if key not in grouped_plans:
-                user_result = await db.execute(
-                    select(User).where(User.fin_kod == plan.fin_kod)
-                )
-                user = user_result.scalar_one_or_none()
-
-                hesabats_result = await db.execute(
-                    select(Hesabat).where(Hesabat.work_plan_serial_number == plan.work_plan_serial_number)
-                )
-                hesabats = hesabats_result.scalars().all()
-
-                if hesabats and all(h.done for h in hesabats):
-                    continue
-
+                user = user_map.get(plan.fin_kod)
+                hesabats = hesabats_by_serial.get(key, [])
                 is_submitted = any(h.submitted for h in hesabats)
 
                 grouped_plans[key] = {
@@ -83,7 +94,7 @@ async def all_plans(
 
             grouped_plans[key]["activity_type_codes"].append(plan.activity_type_code)
 
-        all_codes = {int(str(code).strip()) for plan in plans for code in [plan.activity_type_code]}
+        all_codes = {int(str(p.activity_type_code).strip()) for p in plans if p.activity_type_code is not None}
 
         activity_names_result = await db.execute(
             select(Activity.activity_type_code, Activity.activity_type_name)
@@ -96,7 +107,7 @@ async def all_plans(
                 code_to_name.get(int(str(code).strip())) for code in group["activity_type_codes"]
             ]
 
-        grouped_list = list(grouped_plans.values())
+        grouped_list = [grouped_plans[s] for s in page_serials if s in grouped_plans]
 
         return JSONResponse(
             content={
