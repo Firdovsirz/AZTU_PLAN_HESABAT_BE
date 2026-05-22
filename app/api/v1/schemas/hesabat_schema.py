@@ -6,6 +6,7 @@ class CreateHesabat(BaseModel):
     work_plan_serial_number: str
     done_percentage: str | None = None
     assessment_score: int | None = None
+    result_indicator: str | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -16,11 +17,13 @@ class CreateHesabat(BaseModel):
         activity_doc_path: UploadFile = File(...),
         done_percentage: str | None = Form(None),
         assessment_score: int | None = Form(None),
+        result_indicator: str | None = Form(None),
     ):
         form_data = cls(
             work_plan_serial_number=work_plan_serial_number,
             done_percentage=done_percentage,
             assessment_score=assessment_score,
+            result_indicator=result_indicator,
         )
         return form_data, activity_doc_path
     

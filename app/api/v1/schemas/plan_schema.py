@@ -9,6 +9,7 @@ class CreatePlan(BaseModel):
     activity_type_code: List[str]
     activity_type_name: Optional[str] = Form(None)
     work_desc: str
+    goal: Optional[str] = Form(None)
     deadline: datetime
 
     @classmethod
@@ -18,6 +19,7 @@ class CreatePlan(BaseModel):
                 activity_type_code: List[str] = Form(...),
                 activity_type_name: Optional[str] = Form(None),
                 work_desc: str = Form(...),
+                goal: Optional[str] = Form(None),
                 deadline: str = Form(...),
     ):
         return cls(
@@ -26,6 +28,7 @@ class CreatePlan(BaseModel):
             activity_type_code=activity_type_code,
             activity_type_name=activity_type_name,
             work_desc=work_desc,
+            goal=goal,
             deadline=deadline,
         )
     

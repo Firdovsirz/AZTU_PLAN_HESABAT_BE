@@ -84,6 +84,7 @@ async def submitted_hesabats(
                     "submitted_at": hesabat.submitted_at.isoformat() if hesabat.submitted_at else None,
                     "duration_analysis": hesabat.duration_analysis,
                     "note": hesabat.note,
+                    "result_indicator": hesabat.result_indicator,
                     "submitted": hesabat.submitted,
                     "done": hesabat.done
                 }
@@ -235,6 +236,7 @@ async def submit_hesabat(
             existing_hesabat.submitted = True
             existing_hesabat.submitted_at = datetime.utcnow()
             existing_hesabat.duration_analysis = duration_analysis
+            existing_hesabat.result_indicator = form_data.result_indicator
 
         await db.commit()
 
@@ -334,6 +336,7 @@ async def get_hesabat_by_fin_kod(
                     "submitted_at": hesabat.submitted_at.isoformat() if hesabat.submitted_at else None,
                     "duration_analysis": hesabat.duration_analysis,
                     "note": hesabat.note,
+                    "result_indicator": hesabat.result_indicator,
                     "submitted": hesabat.submitted
                 }
 
@@ -432,6 +435,7 @@ async def get_hesabat_by_serial_number(
                     "submitted_at": hesabat.submitted_at.isoformat() if hesabat.submitted_at else None,
                     "duration_analysis": hesabat.duration_analysis,
                     "note": hesabat.note,
+                    "result_indicator": hesabat.result_indicator,
                     "submitted": hesabat.submitted
                 }
 
@@ -666,6 +670,7 @@ async def get_archive(
                     "done_percentage": hesabat.done_percentage,
                     "admin_assessment": hesabat.admin_assessment,
                     "ai_assessment": hesabat.ai_assessment,
+                    "result_indicator": hesabat.result_indicator,
                 }
 
             code_int = int(hesabat.activity_type_code) if hesabat.activity_type_code is not None else None

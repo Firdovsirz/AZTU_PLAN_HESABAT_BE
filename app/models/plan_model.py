@@ -17,6 +17,7 @@ class Plan(Base):
     activity_type_code = Column(String, nullable=False)
     activity_type_name = Column(String)
     work_desc = Column(String)
+    goal = Column(String)
     deadline = Column(DateTime)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime)

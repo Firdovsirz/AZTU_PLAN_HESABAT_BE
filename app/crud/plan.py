@@ -70,6 +70,7 @@ async def all_plans(
                     "work_year": plan.work_year,
                     "work_row_number": plan.work_row_number,
                     "work_desc": plan.work_desc,
+                    "goal": plan.goal,
                     "deadline": plan.deadline.isoformat() if plan.deadline else None,
                     "created_at": plan.created_at.isoformat() if plan.created_at else None,
                     "is_submitted": is_submitted,
@@ -156,6 +157,7 @@ async def create_plan(
                 activity_type_code=code,
                 activity_type_name=form_data.activity_type_name if form_data.activity_type_name else None,
                 work_desc=form_data.work_desc,
+                goal=form_data.goal,
                 deadline=form_data.deadline,
                 created_at=datetime.utcnow(),
                 updated_at=None
@@ -228,6 +230,7 @@ async def get_plan_by_fin_kod(
                     "work_year": int(plan.work_year),
                     "work_row_number": int(plan.work_row_number),
                     "work_desc": str(plan.work_desc),
+                    "goal": plan.goal,
                     "deadline": plan.deadline.isoformat() if plan.deadline else None,
                     "activity_type_names": []
                 }
@@ -301,6 +304,7 @@ async def get_plan_by_serial_number(
                 "work_plan_serial_number": str(first_plan.work_plan_serial_number) if first_plan.work_plan_serial_number is not None else None,
                 "work_year": int(first_plan.work_year),
                 "work_desc": str(first_plan.work_desc) if first_plan.work_desc is not None else None,
+                "goal": first_plan.goal,
                 "deadline": first_plan.deadline.isoformat() if first_plan.deadline else None,
                 "activities": activity_list
             },
@@ -365,6 +369,7 @@ async def add_activity_to_plan(
                 activity_type_code=code,
                 activity_type_name=req_data.activity_type_names[idx] if req_data.activity_type_names else None,
                 work_desc=plan.work_desc,
+                goal=plan.goal,
                 deadline=plan.deadline,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
