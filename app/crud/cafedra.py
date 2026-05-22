@@ -6,6 +6,10 @@ from app.db.session import get_db
 from sqlalchemy.future import select
 from app.models.duty_model import Duty
 from app.models.user_model import User
+from app.models.plan_model import Plan
+from app.models.hesabat_model import Hesabat
+from app.models.activity_model import Activity
+from app.models.faculty_model import Faculty
 from fastapi import Depends, status, Query
 from fastapi.responses import JSONResponse
 from app.models.cafedra_model import Cafedra
@@ -285,6 +289,145 @@ async def cafedra_users(
                 "error": str(e)
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+async def cafedra_plans_hesabats(
+        cafedra_code: str,
+        db: AsyncSession = Depends(get_db)
+):
+    try:
+        cafedra_result = await db.execute(
+            select(Cafedra).where(Cafedra.cafedra_code == cafedra_code)
+        )
+        cafedra = cafedra_result.scalar_one_or_none()
+
+        if not cafedra:
+            return JSONResponse(
+                content={
+                    "statusCode": 404,
+                    "message": "No cafedra found."
+                }, status_code=status.HTTP_404_NOT_FOUND
+            )
+
+        faculty_result = await db.execute(
+            select(Faculty).where(Faculty.faculty_code == cafedra.faculty_code)
+        )
+        faculty = faculty_result.scalar_one_or_none()
+
+        users_result = await db.execute(
+            select(User).where(User.cafedra_code == cafedra_code)
+        )
+        users = users_result.scalars().all()
+
+        if not users:
+            return JSONResponse(
+                content={
+                    "statusCode": 200,
+                    "message": "No users in cafedra.",
+                    "cafedra_code": cafedra.cafedra_code,
+                    "cafedra_name": cafedra.cafedra_name,
+                    "faculty_code": cafedra.faculty_code,
+                    "faculty_name": faculty.faculty_name if faculty else None,
+                    "items": []
+                }, status_code=status.HTTP_200_OK
+            )
+
+        user_map = {u.fin_kod: u for u in users}
+        fin_kods = list(user_map.keys())
+
+        plans_result = await db.execute(
+            select(Plan).where(Plan.fin_kod.in_(fin_kods))
+        )
+        plans = plans_result.scalars().all()
+
+        hesabats_result = await db.execute(
+            select(Hesabat).where(Hesabat.fin_kod.in_(fin_kods))
+        )
+        hesabats = hesabats_result.scalars().all()
+
+        hesabat_by_serial = {}
+        for h in hesabats:
+            hesabat_by_serial.setdefault(h.work_plan_serial_number, []).append(h)
+
+        all_codes = set()
+        for p in plans:
+            try:
+                all_codes.add(int(str(p.activity_type_code).strip()))
+            except (TypeError, ValueError):
+                pass
+
+        code_to_name = {}
+        if all_codes:
+            activity_result = await db.execute(
+                select(Activity.activity_type_code, Activity.activity_type_name)
+                .where(Activity.activity_type_code.in_(all_codes))
+            )
+            code_to_name = {int(code): name for code, name in activity_result.all()}
+
+        grouped = {}
+        for plan in plans:
+            key = plan.work_plan_serial_number
+            user = user_map.get(plan.fin_kod)
+            if key not in grouped:
+                hesabat_rows = hesabat_by_serial.get(key, [])
+                is_submitted = any(h.submitted for h in hesabat_rows)
+                is_done = bool(hesabat_rows) and all(h.done for h in hesabat_rows)
+                admin_scores = [h.admin_assessment for h in hesabat_rows if h.admin_assessment is not None]
+                ai_scores = [h.ai_assessment for h in hesabat_rows if h.ai_assessment is not None]
+                done_percentages = [h.done_percentage for h in hesabat_rows if h.done_percentage is not None]
+                grouped[key] = {
+                    "fin_kod": plan.fin_kod,
+                    "name": user.name if user else None,
+                    "surname": user.surname if user else None,
+                    "father_name": user.father_name if user else None,
+                    "work_plan_serial_number": plan.work_plan_serial_number,
+                    "work_year": plan.work_year,
+                    "work_row_number": plan.work_row_number,
+                    "work_desc": plan.work_desc,
+                    "deadline": plan.deadline.isoformat() if plan.deadline else None,
+                    "created_at": plan.created_at.isoformat() if plan.created_at else None,
+                    "activity_type_codes": [],
+                    "activity_type_names": [],
+                    "is_submitted": is_submitted,
+                    "is_done": is_done,
+                    "admin_assessment": admin_scores[0] if admin_scores else None,
+                    "ai_assessment": ai_scores[0] if ai_scores else None,
+                    "done_percentage": done_percentages[0] if done_percentages else None,
+                }
+            try:
+                code_int = int(str(plan.activity_type_code).strip())
+            except (TypeError, ValueError):
+                code_int = None
+            grouped[key]["activity_type_codes"].append(plan.activity_type_code)
+            grouped[key]["activity_type_names"].append(code_to_name.get(code_int) if code_int is not None else None)
+
+        items = sorted(
+            grouped.values(),
+            key=lambda x: (x.get("created_at") or "", x.get("work_row_number") or 0),
+            reverse=True
+        )
+
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Cafedra plans and reports fetched successfully.",
+                "cafedra_code": cafedra.cafedra_code,
+                "cafedra_name": cafedra.cafedra_name,
+                "faculty_code": cafedra.faculty_code,
+                "faculty_name": faculty.faculty_name if faculty else None,
+                "items": items
+            }, status_code=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(
+            content={
+                "error": str(e),
+                "statusCode": 500
+            }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
 
 async def update_cafedra_name(
     cafedra_code: str,

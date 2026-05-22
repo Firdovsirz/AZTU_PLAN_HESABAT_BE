@@ -71,6 +71,17 @@ async def delete_cafedra_endpoint(
 ):
     return await delete_cafedra(cafedra_code, db)
 
+@router.get("/cafedra/{cafedra_code}/plans-hesabats")
+@limiter.limit("200/minute")
+async def get_cafedra_plans_hesabats_endpoint(
+    request: Request,
+    cafedra_code: Annotated[str, Path(..., description="Cafedra Code")],
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([1]))
+):
+    return await cafedra_plans_hesabats(cafedra_code, db)
+
+
 @router.get("/cafedra/{cafedra_code}/users/{start}/{end}")
 @limiter.limit("100/minute")
 async def get_cafedra_users_endpoint(
