@@ -26,6 +26,17 @@ async def get_department_endpoint(
 ):
     return await get_department_by_code(department_code, db)
 
+@router.get("/department/{department_code}/plans-hesabats")
+@limiter.limit("200/minute")
+async def get_department_plans_hesabats_endpoint(
+    request: Request,
+    department_code: Annotated[str, Path(..., description="Department Code")],
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([1]))
+):
+    return await department_plans_hesabats(department_code, db)
+
+
 @router.post("/add-department/{department_code}/{department_name}")
 @limiter.limit("300/minute")
 async def add_department_endpoint(
