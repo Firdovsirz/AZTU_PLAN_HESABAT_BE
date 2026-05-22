@@ -416,14 +416,16 @@ async def get_hesabat_by_serial_number(
 
             if key not in grouped:
                 doc_name = os.path.basename(hesabat.activity_doc_path) if hesabat.activity_doc_path else None
+                plan_row = (await db.execute(
+                    select(Plan)
+                    .where(Plan.work_plan_serial_number == hesabat.work_plan_serial_number)
+                )).scalars().first()
                 grouped[key] = {
                     "fin_kod": hesabat.fin_kod,
                     "work_plan_serial_number": hesabat.work_plan_serial_number,
                     "doc_name": doc_name,
-                    "work_desc": ((await db.execute(
-                        select(Plan)
-                        .where(Plan.work_plan_serial_number == hesabat.work_plan_serial_number)
-                    ))).scalars().all()[0].work_desc,
+                    "work_desc": plan_row.work_desc if plan_row else None,
+                    "goal": plan_row.goal if plan_row else None,
                     "activity_doc_path": f"/static/report/{hesabat.work_plan_serial_number}/{os.path.basename(hesabat.activity_doc_path)}"
                                          if hesabat.activity_doc_path else None,
                     "done_percentage": hesabat.done_percentage,
