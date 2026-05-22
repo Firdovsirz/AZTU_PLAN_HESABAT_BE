@@ -61,7 +61,7 @@ async def create_activity(
             activity_type_code=max_activity_code+1,
             activity_type_name=activity_type_name,
             created_at=datetime.utcnow(),
-            approved=False,
+            approved=True,
             fin_kod=fin_kod
         )
 

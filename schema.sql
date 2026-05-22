@@ -118,9 +118,9 @@ CREATE INDEX IF NOT EXISTS ix_assessment_id ON assessment (id);
 CREATE TABLE IF NOT EXISTS work_plan (
     id                      SERIAL PRIMARY KEY,
     fin_kod                 VARCHAR   NOT NULL,
-    work_plan_serial_number VARCHAR   NOT NULL UNIQUE,
+    work_plan_serial_number VARCHAR   NOT NULL,
     work_year               INTEGER   NOT NULL,
-    work_row_number         INTEGER   NOT NULL UNIQUE,
+    work_row_number         INTEGER   NOT NULL,
     activity_type_code      VARCHAR   NOT NULL,
     activity_type_name      VARCHAR,
     work_desc               VARCHAR,
