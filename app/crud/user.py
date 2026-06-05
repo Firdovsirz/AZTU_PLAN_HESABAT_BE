@@ -53,7 +53,7 @@ async def get_dekan(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -115,7 +115,7 @@ async def dekans(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -161,7 +161,7 @@ async def caf_director(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -223,7 +223,7 @@ async def caf_directors(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -259,7 +259,6 @@ async def all_users(
         elif cafedra_code:
             filters.append(User.cafedra_code == cafedra_code)
 
-        print(filters)
 
         query = select(User)
         if filters:
@@ -309,7 +308,7 @@ async def all_users(
 
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e), "statusCode": 500},
+            content={"error": "Internal server error", "statusCode": 500},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -370,7 +369,7 @@ async def create_user(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -379,9 +378,22 @@ async def create_user(
 
 async def update_user(
     user_details: UpdateUser,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: dict | None = None
 ):
     try:
+        # Authorization: admins/developers (roles 0,1) may update any user.
+        # Everyone else may only update their OWN record (prevents IDOR).
+        is_admin = bool(current_user and current_user.get("role") in (0, 1))
+        if current_user is not None and not is_admin:
+            if current_user.get("fin_kod") != user_details.fin_kod:
+                return JSONResponse(
+                    content={
+                        "statusCode": 403,
+                        "message": "You can only update your own profile."
+                    }, status_code=status.HTTP_403_FORBIDDEN
+                )
+
         result = await db.execute(
             select(User)
             .where(User.fin_kod == user_details.fin_kod)
@@ -396,18 +408,20 @@ async def update_user(
                     "message": "User not found."
                 }, status_code=status.HTTP_404_NOT_FOUND
             )
-        
+
         if user_details.name is not None:
             user.name = user_details.name
         if user_details.surname is not None:
             user.surname = user_details.surname
         if user_details.father_name is not None:
             user.father_name = user_details.father_name
-        if user_details.duty_code is not None:
+        # Org-membership / role-relevant fields can only be changed by admins,
+        # so a regular user cannot escalate by reassigning their own duty/faculty/cafedra.
+        if user_details.duty_code is not None and is_admin:
             user.duty_code = user_details.duty_code
-        if user_details.faculty_code is not None:
+        if user_details.faculty_code is not None and is_admin:
             user.faculty_code = user_details.faculty_code
-        if user_details.cafedra_code is not None:
+        if user_details.cafedra_code is not None and is_admin:
             user.cafedra_code = user_details.cafedra_code
 
         user.updated_at = datetime.utcnow()
@@ -425,7 +439,7 @@ async def update_user(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -476,7 +490,7 @@ async def get_user_by_fin_kod(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
@@ -534,7 +548,7 @@ async def get_execution_users(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -591,7 +605,7 @@ async def get_app_waiting_users(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

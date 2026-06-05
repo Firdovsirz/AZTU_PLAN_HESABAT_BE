@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 from sqlalchemy import func
 from datetime import datetime
@@ -75,7 +76,7 @@ async def submitted_hesabats(
                     "plan_work_serial_number": hesabat.work_plan_serial_number,
                     "activity_type_codes": [],
                     "activity_type_names": [],
-                    "activity_doc_path": f"/static/report/{hesabat.work_plan_serial_number}/{os.path.basename(hesabat.activity_doc_path)}" if hesabat.activity_doc_path else None,
+                    "activity_doc_path": f"/api/secure-doc/{hesabat.work_plan_serial_number}/{os.path.basename(hesabat.activity_doc_path)}" if hesabat.activity_doc_path else None,
                     "done_percentage": hesabat.done_percentage,
                     "work_year": plan.work_year if plan else None,
                     "assessment_score": hesabat.assessment_score,
@@ -104,7 +105,7 @@ async def submitted_hesabats(
 
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -160,11 +161,41 @@ async def done_hesabat(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
 # Submit hesabat
+
+REPORT_BASE_DIR = os.path.abspath("static/report")
+ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".doc", ".docx", ".png", ".jpg", ".jpeg"}
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+_SAFE_SERIAL_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _resolve_report_path(serial_number: str, filename: str) -> str:
+    """Build a safe path inside REPORT_BASE_DIR, rejecting traversal attempts."""
+    if not serial_number or not _SAFE_SERIAL_RE.match(serial_number):
+        raise ValueError("Invalid work plan serial number.")
+
+    # Never trust the client-supplied filename: keep only its basename and
+    # strip anything outside a conservative allowlist.
+    base_name = os.path.basename(filename or "")
+    safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", base_name).lstrip(".") or "upload"
+
+    ext = os.path.splitext(safe_name)[1].lower()
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise ValueError("File type not allowed.")
+
+    folder = os.path.join(REPORT_BASE_DIR, serial_number)
+    file_path = os.path.normpath(os.path.join(folder, safe_name))
+
+    # Final guard: resolved path must stay within the report base directory.
+    if not file_path.startswith(REPORT_BASE_DIR + os.sep):
+        raise ValueError("Invalid file path.")
+
+    return folder, file_path
+
 
 async def submit_hesabat(
         form_data_and_file: tuple[CreateHesabat, UploadFile] = Depends(CreateHesabat.as_form),
@@ -172,14 +203,34 @@ async def submit_hesabat(
 ):
     form_data, activity_doc_path = form_data_and_file
 
-    work_serial_number_folder = f"static/report/{form_data.work_plan_serial_number}"
-    os.makedirs(work_serial_number_folder, exist_ok=True)
+    try:
+        folder, file_path = _resolve_report_path(
+            form_data.work_plan_serial_number, activity_doc_path.filename
+        )
+    except ValueError as exc:
+        return JSONResponse(
+            content={"statusCode": 400, "message": str(exc)},
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
 
-    file_path = os.path.join(work_serial_number_folder, activity_doc_path.filename)
+    # Enforce a maximum upload size while streaming to disk.
+    os.makedirs(folder, exist_ok=True)
+    total = 0
     with open(file_path, "wb") as buffer:
-        copyfileobj(activity_doc_path.file, buffer)
+        while True:
+            chunk = activity_doc_path.file.read(1024 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > MAX_UPLOAD_SIZE:
+                buffer.close()
+                os.remove(file_path)
+                return JSONResponse(
+                    content={"statusCode": 413, "message": "File too large."},
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                )
+            buffer.write(chunk)
 
-    print("in")
     try:
         if not hasattr(form_data, "assessment_score") or form_data.assessment_score is None \
            or not hasattr(form_data, "done_percentage") or form_data.done_percentage is None:
@@ -251,7 +302,7 @@ async def submit_hesabat(
         logger.exception("Error in submit_hesabat")
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -291,7 +342,7 @@ async def delete_hesabat(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -364,7 +415,7 @@ async def get_hesabat_by_fin_kod(
         traceback.print_exc()
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -426,7 +477,7 @@ async def get_hesabat_by_serial_number(
                     "doc_name": doc_name,
                     "work_desc": plan_row.work_desc if plan_row else None,
                     "goal": plan_row.goal if plan_row else None,
-                    "activity_doc_path": f"/static/report/{hesabat.work_plan_serial_number}/{os.path.basename(hesabat.activity_doc_path)}"
+                    "activity_doc_path": f"/api/secure-doc/{hesabat.work_plan_serial_number}/{os.path.basename(hesabat.activity_doc_path)}"
                                          if hesabat.activity_doc_path else None,
                     "done_percentage": hesabat.done_percentage,
                     "assessment_score": hesabat.assessment_score,
@@ -458,10 +509,45 @@ async def get_hesabat_by_serial_number(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+# Securely serve an uploaded report document (auth-protected, traversal-safe).
+
+async def serve_report_doc(serial_number: str, doc_name: str):
+    try:
+        if not serial_number or not _SAFE_SERIAL_RE.match(serial_number):
+            return JSONResponse(
+                content={"statusCode": 404, "message": "Document not found."},
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        base_name = os.path.basename(doc_name or "")
+        folder = os.path.join(REPORT_BASE_DIR, serial_number)
+        file_path = os.path.normpath(os.path.join(folder, base_name))
+
+        # The resolved path must stay inside the report base directory.
+        if not file_path.startswith(REPORT_BASE_DIR + os.sep):
+            return JSONResponse(
+                content={"statusCode": 404, "message": "Document not found."},
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(path=file_path, filename=base_name)
+
+        return JSONResponse(
+            content={"statusCode": 404, "message": "Document not found."},
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    except Exception:
+        return JSONResponse(
+            content={"statusCode": 500, "message": "Internal server error"},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
 
 # Get single hesabat document by serial number
 
@@ -502,7 +588,7 @@ async def get_doc_by_serial_number(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -565,7 +651,7 @@ async def add_assessment(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -609,7 +695,7 @@ async def update_assessment(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -692,6 +778,6 @@ async def get_archive(
 
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e), "statusCode": 500},
+            content={"error": "Internal server error", "statusCode": 500},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

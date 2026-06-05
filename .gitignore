@@ -205,3 +205,11 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# --- Security: never commit secrets, credentials or user-uploaded data ---
+.env.*
+!.env.example
+**/service_account.json
+app/utils/ai/output.pdf
+app/utils/ai/downloaded.pdf
+static/report/

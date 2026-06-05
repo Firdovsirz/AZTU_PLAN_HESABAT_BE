@@ -59,6 +59,7 @@ async def create_plan_endpoint(
 async def update_plan_endpoint(
     request: Request,
     req_data: AddActivityToPlan,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([0, 1, 2, 3, 4]))
 ):
     return await add_activity_to_plan(req_data, db)

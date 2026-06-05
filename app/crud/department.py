@@ -60,7 +60,7 @@ async def create_department(
     except Exception as e:
         logger.exception("Error while creating department")
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -96,7 +96,7 @@ async def get_departments(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         logger.exception("Error while fetching departments")
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -130,7 +130,7 @@ async def get_department_by_code(
     except Exception as e:
         logger.exception("Error while fetching department by code")
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -187,7 +187,7 @@ async def update_department(
     except Exception as e:
         logger.exception("Error while updating department")
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -315,7 +315,7 @@ async def department_plans_hesabats(
         traceback.print_exc()
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -353,6 +353,6 @@ async def delete_department(
     except Exception as e:
         logger.exception("Error while deleting department")
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

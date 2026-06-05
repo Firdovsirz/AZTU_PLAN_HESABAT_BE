@@ -1,4 +1,4 @@
-import random
+import secrets
 import asyncio
 from sqlalchemy import func
 from typing import Annotated
@@ -21,8 +21,9 @@ from app.api.v1.schemas.auth_schema import AuthCreate, Signin, ResetPassword
 templates = Jinja2Templates(directory="templates")
 
 async def generateOtp(length: int = 6) -> str:
-    otp = ''.join(str(random.randint(0, 9)) for _ in range(length))
-    return otp
+    # 6-digit OTP from a cryptographically secure RNG. The 100000-999999 range
+    # guarantees a full 6 digits so no entropy is lost in the integer column.
+    return str(secrets.randbelow(900000) + 100000)
 
 async def signup(
         form_data: Annotated[AuthCreate, Depends(AuthCreate.as_form)],
@@ -98,7 +99,7 @@ async def signup(
 
     except Exception as e:
         return JSONResponse(content={
-            "error": str(e)
+            "error": "Internal server error"
         }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)   
 
 async def create_admin(
@@ -164,7 +165,7 @@ async def create_admin(
 
     except Exception as e:
         return JSONResponse(content={
-            "error": str(e)
+            "error": "Internal server error"
         }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 async def signin(
@@ -221,7 +222,7 @@ async def signin(
     
     except Exception as e:
         return JSONResponse(content={
-            "error": str(e)
+            "error": "Internal server error"
         }, status_code=500)
 
 async def approve_user(
@@ -270,7 +271,7 @@ async def approve_user(
     
     except Exception as e:
         return JSONResponse(content={
-            "error": str(e)
+            "error": "Internal server error"
         }, status_code=500)
     
 async def reject_app_user(
@@ -316,7 +317,7 @@ async def reject_app_user(
     
     except Exception as e:
         return JSONResponse(content={
-            "error": str(e)
+            "error": "Internal server error"
         }, status_code=500)
 
 async def app_wait_users(
@@ -390,7 +391,7 @@ async def app_wait_users(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -455,7 +456,7 @@ async def send_otp(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -489,9 +490,6 @@ async def validate_otp(
                 status_code=status.HTTP_401_UNAUTHORIZED
             )
 
-        print("Provided OTP:", otp)
-        print("Stored OTP in DB:", auth_user.otp)
-
         if int(otp) == int(auth_user.otp):
             token = encode_otp_token(fin_kod, user.email, otp)
             return JSONResponse(
@@ -509,7 +507,7 @@ async def validate_otp(
 
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e), "statusCode": 500},
+            content={"error": "Internal server error", "statusCode": 500},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -561,6 +559,6 @@ async def reset_password(
 
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e), "statusCode": 500},
+            content={"error": "Internal server error", "statusCode": 500},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

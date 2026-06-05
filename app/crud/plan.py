@@ -122,7 +122,7 @@ async def all_plans(
     except Exception as e:
         logger.exception("Error fetching all plans")
         return JSONResponse(
-            content={"error": str(e), "statusCode": 500},
+            content={"error": "Internal server error", "statusCode": 500},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -203,7 +203,7 @@ async def create_plan(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -271,7 +271,7 @@ async def get_plan_by_fin_kod(
         traceback.print_exc()
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -325,7 +325,7 @@ async def get_plan_by_serial_number(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -408,7 +408,7 @@ async def add_activity_to_plan(
         logger.exception("Error occurred in add_activity_to_plan")
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

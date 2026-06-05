@@ -130,6 +130,6 @@ async def update_user_endpoint(
     request: Request,
     user_details: UpdateUser,
     db: AsyncSession = Depends(get_db),
-    _current_user=Depends(token_required([0, 1, 2, 3, 4]))
+    current_user=Depends(token_required([0, 1, 2, 3, 4]))
 ):
-    return await update_user(user_details, db)
+    return await update_user(user_details, db, current_user)

@@ -42,7 +42,7 @@ async def create_assessment(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
@@ -79,7 +79,7 @@ async def get_assessments(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -118,7 +118,7 @@ async def get_assessment_by_score(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -155,6 +155,6 @@ async def delete_assessment(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

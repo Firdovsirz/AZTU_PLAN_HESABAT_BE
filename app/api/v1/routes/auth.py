@@ -22,7 +22,7 @@ async def get_app_wait_users_end(
     return await app_wait_users(db, start, end)
 
 @router.post("/signup")
-@limiter.limit("500/minute")
+@limiter.limit("20/minute")
 async def signup_endpoint(
     request: Request,
     form_data: Annotated[AuthCreate, Depends(AuthCreate.as_form)],
@@ -31,16 +31,17 @@ async def signup_endpoint(
     return await signup(form_data, db)
 
 @router.post("/create-admin")
-@limiter.limit("100/minute")
+@limiter.limit("20/minute")
 async def create_admin_endpoint(
     request: Request,
     form_data: Annotated[AuthCreate, Depends(AuthCreate.as_form)],
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([1]))
 ):
     return await create_admin(form_data, db)
 
 @router.post("/signin")
-@limiter.limit("500/minute")
+@limiter.limit("10/minute")
 async def signin_endpoint(
     request: Request,
     credentials: Signin,
@@ -59,7 +60,7 @@ async def approve_user_endpoint(
     return await approve_user(fin_kod, db)
 
 @router.post("/send-otp/{fin_kod}")
-@limiter.limit("200/minute")
+@limiter.limit("5/minute")
 async def send_otp_endpoint(
     request: Request,
     fin_kod: Annotated[str, Path(..., description="Fin Kod")],
@@ -68,7 +69,7 @@ async def send_otp_endpoint(
     return await send_otp(fin_kod, db)
 
 @router.post("/validate-otp/{fin_kod}/{otp}")
-@limiter.limit("200/minute")
+@limiter.limit("10/minute")
 async def validate_otp_endpoint(
     request: Request,
     fin_kod: Annotated[str, Path(..., description="Fin Kod")],
@@ -78,7 +79,7 @@ async def validate_otp_endpoint(
     return await validate_otp(fin_kod, otp, db)
 
 @router.post("/reset-password")
-@limiter.limit("200/minute")
+@limiter.limit("10/minute")
 async def reset_pass_endpoint(
     request: Request,
     reset_data: ResetPassword,

@@ -32,7 +32,7 @@ async def get_hesabat_by_fin_kod_endpoint(
     start: int,
     end: int,
     db: AsyncSession = Depends(get_db),
-    # _current_user=Depends(token_required([0, 1, 2, 3, 4]))
+    _current_user=Depends(token_required([0, 1, 2, 3, 4]))
 ):
     return await get_hesabat_by_fin_kod(fin_kod, start, end, db)
 
@@ -42,7 +42,7 @@ async def get_hesabat_by_fin_kod_endpoint(
     request: Request,
     serial_number:  Annotated[str, Path(..., description="Serial Number")],
     db: AsyncSession = Depends(get_db),
-    # _current_user=Depends(token_required([0, 1, 2, 3, 4]))
+    _current_user=Depends(token_required([0, 1, 2, 3, 4]))
 ):
     return await get_hesabat_by_serial_number(serial_number, db)
 
@@ -51,11 +51,22 @@ async def get_hesabat_by_fin_kod_endpoint(
 @limiter.limit("500/second")
 async def get_doc_endpoint(
     request: Request,
-    serial_number: Annotated[str, Path(..., description="Work Serial Number")],
+    work_plan_serial_number: Annotated[str, Path(..., description="Work Serial Number")],
+    doc_name: Annotated[str, Path(..., description="Document Name")],
     db: AsyncSession = Depends(get_db),
     _current_user=Depends(token_required([0, 1, 2, 3, 4]))
 ):
-    return await get_doc_by_serial_number(serial_number, db)
+    return await get_doc_by_serial_number(work_plan_serial_number, db)
+
+@router.get("/secure-doc/{work_plan_serial_number}/{doc_name}")
+@limiter.limit("500/minute")
+async def secure_doc_endpoint(
+    request: Request,
+    work_plan_serial_number: Annotated[str, Path(..., description="Work Plan Serial Number")],
+    doc_name: Annotated[str, Path(..., description="Document file name")],
+    _current_user=Depends(token_required([0, 1, 2, 3, 4]))
+):
+    return await serve_report_doc(work_plan_serial_number, doc_name)
 
 @router.get("/archive/{start}/{end}")
 @limiter.limit("100/minute")
@@ -63,7 +74,8 @@ async def archive_endpoint(
     request: Request,
     start: int,
     end: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([0, 1]))
 ):
     return await get_archive(db, start, end)
 

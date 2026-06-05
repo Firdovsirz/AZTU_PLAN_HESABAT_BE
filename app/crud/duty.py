@@ -62,7 +62,7 @@ async def create_duty(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
         
@@ -102,7 +102,7 @@ async def get_duties(db: AsyncSession = Depends(get_db), org_type: str | None = 
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
@@ -137,7 +137,7 @@ async def get_duty_by_code(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
@@ -193,7 +193,7 @@ async def update_duty(
 
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -230,6 +230,6 @@ async def delete_duty(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

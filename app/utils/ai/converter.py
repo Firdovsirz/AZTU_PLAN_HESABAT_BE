@@ -58,8 +58,8 @@ def download_pdf(drive_link: str = Query(..., description="Google Drive file lin
         output_file = "downloaded.pdf"
         file_path = download_as_pdf(file_id, output_file)
         return FileResponse(file_path, filename=output_file, media_type="application/pdf")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # import os

@@ -39,7 +39,7 @@ async def get_fac_name(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -84,7 +84,7 @@ async def create_faculty(
 
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -107,7 +107,6 @@ async def get_faculties_from_lms(db: AsyncSession = Depends(get_db)):
         response.raise_for_status()
         faculty_data = response.json()
 
-        print("faculty_data:", faculty_data)
 
         if isinstance(faculty_data, dict) and "faculties" in faculty_data:
             faculty_list = faculty_data["faculties"]
@@ -150,7 +149,7 @@ async def get_faculties_from_lms(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
@@ -202,7 +201,7 @@ async def update_faculty_name(
 
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -236,7 +235,7 @@ async def delete_faculty(
 
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -274,6 +273,6 @@ async def get_faculties_from_local(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

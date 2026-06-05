@@ -82,7 +82,7 @@ async def create_activity(
         logger.exception("Error while creating activity")
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
@@ -127,7 +127,7 @@ async def get_activity(fin_kod: str, db: AsyncSession  = Depends(get_db)):
         logger.exception("Error while fetching activities")
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
@@ -163,7 +163,7 @@ async def get_activity_name_by_code(
         logger.exception("Error while fetching activity name by code")
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -224,7 +224,7 @@ async def update_activity(
         logger.exception("Error while updating activity")
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -262,6 +262,6 @@ async def delete_activity(
         logger.exception("Error while deleting activity")
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

@@ -55,7 +55,7 @@ async def get_caf_details(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -103,7 +103,7 @@ async def create_cafedra(
 
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -167,7 +167,7 @@ async def get_cafedras_from_lms(db: AsyncSession = Depends(get_db)):
 
     except Exception as e:
         return JSONResponse(content={
-            "error": str(e)
+            "error": "Internal server error"
         }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
     )
     
@@ -207,7 +207,7 @@ async def get_cafedras_by_faculty_code(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
     
@@ -286,7 +286,7 @@ async def cafedra_users(
     except Exception as e:
         return JSONResponse(
             content={
-                "error": str(e)
+                "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -423,7 +423,7 @@ async def cafedra_plans_hesabats(
         traceback.print_exc()
         return JSONResponse(
             content={
-                "error": str(e),
+                "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
@@ -463,7 +463,7 @@ async def update_cafedra_name(
 
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -497,6 +497,6 @@ async def delete_cafedra(
 
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": "Internal server error"},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
