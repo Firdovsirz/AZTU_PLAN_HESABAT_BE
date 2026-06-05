@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AZTU Plan &amp; Hesabat — API</title>
+  <meta name="description" content="AZTU Plan və Hesabat sisteminin backend API xidməti." />
+  <style>
+    :root {
+      --bg: #0b1020;
+      --bg-soft: #111833;
+      --card: rgba(255, 255, 255, 0.04);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #e8ecf6;
+      --muted: #9aa6c4;
+      --accent: #4f7cff;
+      --accent-2: #22d3ee;
+      --ok: #34d399;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(79, 124, 255, 0.25), transparent 60%),
+        radial-gradient(900px 500px at -10% 20%, rgba(34, 211, 238, 0.18), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 48px 24px 64px;
+    }
+
+    header.hero {
+      text-align: center;
+      padding: 32px 0 16px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--card);
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--ok);
+      box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.18);
+    }
+
+    h1 {
+      margin: 22px 0 10px;
+      font-size: clamp(30px, 5vw, 46px);
+      line-height: 1.1;
+      letter-spacing: -0.5px;
+      background: linear-gradient(90deg, #fff, #b9c6ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: clamp(15px, 2.4vw, 18px);
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin-top: 40px;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: 16px;
+      padding: 22px;
+      backdrop-filter: blur(6px);
+      transition: transform 0.18s ease, border-color 0.18s ease;
+    }
+    .card:hover { transform: translateY(-3px); border-color: rgba(79,124,255,0.45); }
+
+    .card .ico {
+      width: 42px; height: 42px;
+      display: grid; place-items: center;
+      border-radius: 12px;
+      background: linear-gradient(135deg, rgba(79,124,255,0.25), rgba(34,211,238,0.18));
+      font-size: 20px;
+      margin-bottom: 14px;
+    }
+    .card h3 { font-size: 17px; margin-bottom: 6px; }
+    .card p { color: var(--muted); font-size: 14px; }
+
+    .section-title {
+      margin: 48px 0 18px;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1.4px;
+      color: var(--muted);
+    }
+
+    .devs {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .dev {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      text-decoration: none;
+      color: inherit;
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: 16px;
+      padding: 18px 20px;
+      transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+    }
+    .dev:hover {
+      transform: translateY(-3px);
+      border-color: rgba(34,211,238,0.5);
+      background: rgba(34, 211, 238, 0.06);
+    }
+
+    .avatar {
+      flex: 0 0 auto;
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      display: grid; place-items: center;
+      font-weight: 700;
+      font-size: 18px;
+      color: #08122e;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+    }
+
+    .dev .meta { min-width: 0; }
+    .dev .name { font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+    .dev .role { color: var(--muted); font-size: 13px; }
+
+    .li {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 12px; color: var(--accent-2);
+      font-weight: 600;
+    }
+    .li svg { width: 14px; height: 14px; fill: currentColor; }
+
+    footer {
+      margin-top: 56px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+      padding-top: 24px;
+    }
+    footer a { color: var(--accent-2); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <span class="badge"><span class="dot"></span> Sistem işləkdir &middot; API v1.0.0</span>
+      <h1>AZTU Plan &amp; Hesabat Sistemi</h1>
+      <p class="subtitle">
+        Azərbaycan Texniki Universitetinin fakültə, kafedra və əməkdaşları
+        üzrə illik fəaliyyət planlarının və hesabatlarının idarə olunması üçün
+        backend API xidməti.
+      </p>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <div class="ico">🔐</div>
+        <h3>Təhlükəsiz Autentifikasiya</h3>
+        <p>JWT əsaslı giriş, rol idarəetməsi və OTP ilə qorunan istifadəçi sessiyaları.</p>
+      </div>
+      <div class="card">
+        <div class="ico">📋</div>
+        <h3>Plan İdarəetməsi</h3>
+        <p>Əməkdaşlar üzrə illik fəaliyyət planlarının yaradılması və izlənməsi.</p>
+      </div>
+      <div class="card">
+        <div class="ico">📊</div>
+        <h3>Hesabat &amp; Qiymətləndirmə</h3>
+        <p>Görülən işlərin hesabatları, qiymətləndirmə və icmal göstəriciləri.</p>
+      </div>
+      <div class="card">
+        <div class="ico">🏛️</div>
+        <h3>Struktur İdarəetməsi</h3>
+        <p>Fakültə, kafedra və şöbələr üzrə təşkilati strukturun tənzimlənməsi.</p>
+      </div>
+    </section>
+
+    <h2 class="section-title">Developers</h2>
+    <section class="devs">
+      <a class="dev" href="https://www.linkedin.com/in/firdovsi-rzaev/" target="_blank" rel="noopener noreferrer">
+        <div class="avatar">FR</div>
+        <div class="meta">
+          <div class="name">Firdovsi Rzaev</div>
+          <div class="role">Full Stack Developer</div>
+          <span class="li">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.98 3.5a2.5 2.5 0 11-.02 5 2.5 2.5 0 01.02-5zM3 9h4v12H3zM9 9h3.8v1.7h.05c.53-1 1.83-2.05 3.77-2.05 4.03 0 4.78 2.65 4.78 6.1V21h-4v-5.3c0-1.26-.02-2.9-1.77-2.9-1.77 0-2.04 1.38-2.04 2.8V21H9z"/></svg>
+            LinkedIn profilinə bax
+          </span>
+        </div>
+      </a>
+
+      <a class="dev" href="https://www.linkedin.com/in/karamshukurlu/" target="_blank" rel="noopener noreferrer">
+        <div class="avatar">KS</div>
+        <div class="meta">
+          <div class="name">Karam Shukurlu</div>
+          <div class="role">Full Stack Developer</div>
+          <span class="li">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.98 3.5a2.5 2.5 0 11-.02 5 2.5 2.5 0 01.02-5zM3 9h4v12H3zM9 9h3.8v1.7h.05c.53-1 1.83-2.05 3.77-2.05 4.03 0 4.78 2.65 4.78 6.1V21h-4v-5.3c0-1.26-.02-2.9-1.77-2.9-1.77 0-2.04 1.38-2.04 2.8V21H9z"/></svg>
+            LinkedIn profilinə bax
+          </span>
+        </div>
+      </a>
+    </section>
+
+    <footer>
+      &copy; <span id="year">2026</span> Azərbaycan Texniki Universiteti (AZTU) &middot;
+      Plan &amp; Hesabat Sistemi. Bütün hüquqlar qorunur.
+    </footer>
+  </div>
+</body>
+</html>

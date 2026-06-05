@@ -4,8 +4,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 
 from app.utils.limiter import register_limiter
 from app.api.v1.routes import (
@@ -41,6 +44,18 @@ app = FastAPI(
 )
 
 register_limiter(app)
+
+# --- Landing page ----------------------------------------------------------
+# The root path serves a static HTML page describing the system and crediting
+# the developers. Loaded once at import time to avoid disk reads per request.
+_INDEX_HTML = (Path(__file__).resolve().parent.parent / "templates" / "index.html").read_text(
+    encoding="utf-8"
+)
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+async def root() -> HTMLResponse:
+    return HTMLResponse(content=_INDEX_HTML)
 
 # NOTE: uploaded report documents contain personal data and are NO LONGER
 # served from a public static mount. They are delivered only through the
