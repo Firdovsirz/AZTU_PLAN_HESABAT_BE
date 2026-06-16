@@ -68,6 +68,7 @@ async def submitted_hesabats(
             if key not in grouped:
                 user = user_map.get(hesabat.fin_kod)
                 plan = plan_map.get(hesabat.work_plan_serial_number)
+                _, doc_public_path = _doc_public_ref(hesabat.work_plan_serial_number, hesabat.activity_doc_path)
                 grouped[key] = {
                     "name": user.name if user else None,
                     "surname": user.surname if user else None,
@@ -76,7 +77,7 @@ async def submitted_hesabats(
                     "plan_work_serial_number": hesabat.work_plan_serial_number,
                     "activity_type_codes": [],
                     "activity_type_names": [],
-                    "activity_doc_path": f"/api/secure-doc/{hesabat.work_plan_serial_number}/{os.path.basename(hesabat.activity_doc_path)}" if hesabat.activity_doc_path else None,
+                    "activity_doc_path": doc_public_path,
                     "done_percentage": hesabat.done_percentage,
                     "work_year": plan.work_year if plan else None,
                     "assessment_score": hesabat.assessment_score,
@@ -168,9 +169,36 @@ async def done_hesabat(
 # Submit hesabat
 
 REPORT_BASE_DIR = os.path.abspath("static/report")
-ALLOWED_UPLOAD_EXTENSIONS = {".pdf", ".doc", ".docx", ".png", ".jpg", ".jpeg"}
+ALLOWED_UPLOAD_EXTENSIONS = {
+    ".pdf",
+    ".doc", ".docx",
+    ".xls", ".xlsx", ".csv",
+    ".ppt", ".pptx",
+    ".txt", ".rtf", ".odt", ".ods", ".odp",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp",
+}
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_DOC_URL_LENGTH = 2048
 _SAFE_SERIAL_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_DOC_URL_RE = re.compile(r"^https?://", re.IGNORECASE)
+
+
+def _is_external_doc_url(value: str | None) -> bool:
+    """True when a stored activity_doc_path is an external URL rather than a
+    locally uploaded file."""
+    return bool(value) and bool(_DOC_URL_RE.match(value))
+
+
+def _doc_public_ref(serial_number: str, raw: str | None):
+    """Map a stored activity_doc_path value to (doc_name, public_path) for API
+    responses. External URLs are returned as-is; uploaded files are exposed via
+    the auth-protected /api/secure-doc endpoint."""
+    if not raw:
+        return None, None
+    if _is_external_doc_url(raw):
+        return raw, raw
+    base = os.path.basename(raw)
+    return base, f"/api/secure-doc/{serial_number}/{base}"
 
 
 def _resolve_report_path(serial_number: str, filename: str) -> str:
@@ -201,35 +229,57 @@ async def submit_hesabat(
         form_data_and_file: tuple[CreateHesabat, UploadFile] = Depends(CreateHesabat.as_form),
         db: AsyncSession = Depends(get_db)
 ):
-    form_data, activity_doc_path = form_data_and_file
+    form_data, activity_doc_file = form_data_and_file
 
-    try:
-        folder, file_path = _resolve_report_path(
-            form_data.work_plan_serial_number, activity_doc_path.filename
-        )
-    except ValueError as exc:
+    doc_url = (form_data.activity_doc_url or "").strip()
+    has_file = activity_doc_file is not None and bool(activity_doc_file.filename)
+
+    # The report document may arrive either as an external URL or as a file
+    # upload — exactly one is required. `stored_doc_ref` is what gets persisted
+    # on the hesabat row (a URL string, or the on-disk path of the saved file).
+    stored_doc_ref = None
+
+    if doc_url:
+        if not _DOC_URL_RE.match(doc_url) or len(doc_url) > MAX_DOC_URL_LENGTH:
+            return JSONResponse(
+                content={"statusCode": 400, "message": "Invalid document URL."},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        stored_doc_ref = doc_url
+    elif has_file:
+        try:
+            folder, file_path = _resolve_report_path(
+                form_data.work_plan_serial_number, activity_doc_file.filename
+            )
+        except ValueError as exc:
+            return JSONResponse(
+                content={"statusCode": 400, "message": str(exc)},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Enforce a maximum upload size while streaming to disk.
+        os.makedirs(folder, exist_ok=True)
+        total = 0
+        with open(file_path, "wb") as buffer:
+            while True:
+                chunk = activity_doc_file.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > MAX_UPLOAD_SIZE:
+                    buffer.close()
+                    os.remove(file_path)
+                    return JSONResponse(
+                        content={"statusCode": 413, "message": "File too large."},
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    )
+                buffer.write(chunk)
+        stored_doc_ref = file_path
+    else:
         return JSONResponse(
-            content={"statusCode": 400, "message": str(exc)},
+            content={"statusCode": 400, "message": "A document file or URL is required."},
             status_code=status.HTTP_400_BAD_REQUEST,
         )
-
-    # Enforce a maximum upload size while streaming to disk.
-    os.makedirs(folder, exist_ok=True)
-    total = 0
-    with open(file_path, "wb") as buffer:
-        while True:
-            chunk = activity_doc_path.file.read(1024 * 1024)
-            if not chunk:
-                break
-            total += len(chunk)
-            if total > MAX_UPLOAD_SIZE:
-                buffer.close()
-                os.remove(file_path)
-                return JSONResponse(
-                    content={"statusCode": 413, "message": "File too large."},
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                )
-            buffer.write(chunk)
 
     try:
         if not hasattr(form_data, "assessment_score") or form_data.assessment_score is None \
@@ -281,7 +331,7 @@ async def submit_hesabat(
             )
 
         for existing_hesabat in hesabat_list:
-            existing_hesabat.activity_doc_path = file_path
+            existing_hesabat.activity_doc_path = stored_doc_ref
             existing_hesabat.done_percentage = form_data.done_percentage
             existing_hesabat.assessment_score = form_data.assessment_score
             existing_hesabat.submitted = True
@@ -375,11 +425,12 @@ async def get_hesabat_by_fin_kod(
             key = hesabat.work_plan_serial_number
 
             if key not in grouped:
+                _, doc_public_path = _doc_public_ref(hesabat.work_plan_serial_number, hesabat.activity_doc_path)
                 grouped[key] = {
                     "fin_kod": hesabat.fin_kod,
                     "work_plan_serial_number": hesabat.work_plan_serial_number,
                     "activity_type_names": [],
-                    "activity_doc_path": hesabat.activity_doc_path,
+                    "activity_doc_path": doc_public_path,
                     "done_percentage": hesabat.done_percentage,
                     "assessment_score": hesabat.assessment_score,
                     "admin_assessment": hesabat.admin_assessment,
@@ -466,7 +517,7 @@ async def get_hesabat_by_serial_number(
             key = hesabat.work_plan_serial_number
 
             if key not in grouped:
-                doc_name = os.path.basename(hesabat.activity_doc_path) if hesabat.activity_doc_path else None
+                doc_name, doc_public_path = _doc_public_ref(hesabat.work_plan_serial_number, hesabat.activity_doc_path)
                 plan_row = (await db.execute(
                     select(Plan)
                     .where(Plan.work_plan_serial_number == hesabat.work_plan_serial_number)
@@ -477,8 +528,7 @@ async def get_hesabat_by_serial_number(
                     "doc_name": doc_name,
                     "work_desc": plan_row.work_desc if plan_row else None,
                     "goal": plan_row.goal if plan_row else None,
-                    "activity_doc_path": f"/api/secure-doc/{hesabat.work_plan_serial_number}/{os.path.basename(hesabat.activity_doc_path)}"
-                                         if hesabat.activity_doc_path else None,
+                    "activity_doc_path": doc_public_path,
                     "done_percentage": hesabat.done_percentage,
                     "assessment_score": hesabat.assessment_score,
                     "admin_assessment": hesabat.admin_assessment,

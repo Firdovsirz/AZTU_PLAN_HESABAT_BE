@@ -7,6 +7,7 @@ class CreateHesabat(BaseModel):
     done_percentage: str | None = None
     assessment_score: int | None = None
     result_indicator: str | None = None
+    activity_doc_url: str | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -14,7 +15,11 @@ class CreateHesabat(BaseModel):
     def as_form(
         cls,
         work_plan_serial_number: str = Form(...),
-        activity_doc_path: UploadFile = File(...),
+        # The report document can be supplied either as a file upload or as an
+        # external URL, so both are optional at the transport level; the CRUD
+        # layer enforces that exactly one is provided.
+        activity_doc_path: UploadFile | None = File(None),
+        activity_doc_url: str | None = Form(None),
         done_percentage: str | None = Form(None),
         assessment_score: int | None = Form(None),
         result_indicator: str | None = Form(None),
@@ -24,6 +29,7 @@ class CreateHesabat(BaseModel):
             done_percentage=done_percentage,
             assessment_score=assessment_score,
             result_indicator=result_indicator,
+            activity_doc_url=activity_doc_url,
         )
         return form_data, activity_doc_path
     
