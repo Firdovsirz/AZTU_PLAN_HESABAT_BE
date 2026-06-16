@@ -183,18 +183,14 @@ async def get_cafedras_by_faculty_code(
 
         cafedras = fetched_cafedras.scalars().all()
 
-        if not cafedras:
-            return JSONResponse(
-                content={
-                    "statusCode": 404,
-                    "message": "No cafedra found."
-                }, status_code=status.HTTP_404_NOT_FOUND
-            )
-
+        # An empty result is a valid (empty) collection, not an error. Returning
+        # 404 here made the client's axios call reject and broke the whole
+        # cafedra-plans page, so respond with 200 and an empty list instead.
         return JSONResponse(
             content={
                 "statusCode": 200,
-                "message": "Cafedras fetched successfully.",
+                "message": "Cafedras fetched successfully." if cafedras else "No cafedra found.",
+                "cafedra_count": len(cafedras),
                 "cafedras": [
                     {
                         "cafedra_code": cafedra.cafedra_code,
