@@ -16,6 +16,7 @@ from app.db.database import engine, Base
 from app.models.request_model import Request as RequestModel
 from app.models.notification_model import Notification as NotificationModel
 from app.models.feedback_model import YouSaidWeDid as FeedbackModel
+from app.models.comment_model import Comment as CommentModel
 from app.api.v1.routes import (
     auth,
     duty,
@@ -30,6 +31,7 @@ from app.api.v1.routes import (
     department,
     notification,
     feedback,
+    comment,
 )
 
 # --- Logging ---------------------------------------------------------------
@@ -107,6 +109,7 @@ app.include_router(hesabat.router, prefix="/api", tags=["Hesabat"])
 app.include_router(request.router, prefix="/api", tags=["Request"])
 app.include_router(notification.router, prefix="/api", tags=["Notification"])
 app.include_router(feedback.router, prefix="/api", tags=["Feedback"])
+app.include_router(comment.router, prefix="/api", tags=["Comment"])
 
 
 # --- Schema bootstrap ------------------------------------------------------
@@ -126,6 +129,7 @@ async def _ensure_schema() -> None:
                         RequestModel.__table__,
                         NotificationModel.__table__,
                         FeedbackModel.__table__,
+                        CommentModel.__table__,
                     ],
                 )
             )
