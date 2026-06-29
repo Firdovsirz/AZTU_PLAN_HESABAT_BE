@@ -46,9 +46,10 @@ async def all_plans(
         page_serials = all_serials[start:end]
 
         if not page_serials:
+            # HTTP 200 with a 204 sentinel body — a real 204 carries no body.
             return JSONResponse(
                 content={"statusCode": 204, "message": "No content"},
-                status_code=status.HTTP_204_NO_CONTENT
+                status_code=status.HTTP_200_OK
             )
 
         fetched_plans = await db.execute(
@@ -411,4 +412,149 @@ async def add_activity_to_plan(
                 "error": "Internal server error",
                 "statusCode": 500
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+# ---------------------------------------------------------------------------
+# Shared apply helpers
+#
+# These mutate the session but DO NOT commit. They are reused both when an
+# admin approves an edit/delete request and when the admin edits/deletes a plan
+# directly. The caller commits (usually via notify_user, which persists the
+# change together with the notification atomically). A missing target raises
+# LookupError so the caller can return a 404.
+# ---------------------------------------------------------------------------
+
+# The only plan fields a user/admin may change through the request/direct flow.
+_PLAN_EDIT_FIELDS = {"work_year", "work_desc", "goal", "deadline"}
+
+
+def _parse_deadline(value):
+    """Accept an ISO date/datetime string (or None) and return a datetime."""
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        return value
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+
+def _coerce_plan_changes(changes: dict) -> dict:
+    cleaned = {}
+    for key, value in (changes or {}).items():
+        if key not in _PLAN_EDIT_FIELDS:
+            continue
+        if key == "work_year":
+            if value in (None, ""):
+                continue
+            cleaned[key] = int(value)
+        elif key == "deadline":
+            cleaned[key] = _parse_deadline(value)
+        else:
+            cleaned[key] = value
+    return cleaned
+
+
+async def apply_plan_edit(db: AsyncSession, serial: str, changes: dict) -> str:
+    """Apply scalar edits to every work_plan row of a serial. Returns owner fin_kod."""
+    result = await db.execute(
+        select(Plan).where(Plan.work_plan_serial_number == serial)
+    )
+    plans = result.scalars().all()
+    if not plans:
+        raise LookupError("plan_not_found")
+
+    cleaned = _coerce_plan_changes(changes)
+    now = datetime.utcnow()
+    for plan in plans:
+        for key, value in cleaned.items():
+            setattr(plan, key, value)
+        plan.updated_at = now
+    return plans[0].fin_kod
+
+
+async def apply_plan_delete(db: AsyncSession, serial: str) -> str:
+    """Delete every work_plan row of a serial plus its hesabats. Returns owner fin_kod."""
+    result = await db.execute(
+        select(Plan).where(Plan.work_plan_serial_number == serial)
+    )
+    plans = result.scalars().all()
+    if not plans:
+        raise LookupError("plan_not_found")
+
+    owner = plans[0].fin_kod
+
+    hes_result = await db.execute(
+        select(Hesabat).where(Hesabat.work_plan_serial_number == serial)
+    )
+    for hesabat in hes_result.scalars().all():
+        await db.delete(hesabat)
+    for plan in plans:
+        await db.delete(plan)
+    return owner
+
+
+# ---------------------------------------------------------------------------
+# Admin direct actions (the admin edits/deletes a plan without a request).
+# ---------------------------------------------------------------------------
+
+async def admin_edit_plan(
+    serial: str,
+    changes: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    from app.utils.notify import notify_user
+    try:
+        owner = await apply_plan_edit(db, serial, changes)
+        await notify_user(
+            db,
+            owner,
+            "Planınız redaktə edildi",
+            f"{serial} nömrəli planınız administrator tərəfindən redaktə edildi.",
+            ntype="info",
+        )
+        return JSONResponse(
+            content={"statusCode": 200, "message": "Plan updated successfully."},
+            status_code=status.HTTP_200_OK,
+        )
+    except LookupError:
+        return JSONResponse(
+            content={"statusCode": 404, "message": "Plan not found."},
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    except Exception:
+        logger.exception("Error in admin_edit_plan")
+        return JSONResponse(
+            content={"error": "Internal server error", "statusCode": 500},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
+async def admin_delete_plan(
+    serial: str,
+    db: AsyncSession = Depends(get_db),
+):
+    from app.utils.notify import notify_user
+    try:
+        owner = await apply_plan_delete(db, serial)
+        await notify_user(
+            db,
+            owner,
+            "Planınız silindi",
+            f"{serial} nömrəli planınız administrator tərəfindən silindi.",
+            ntype="error",
+        )
+        return JSONResponse(
+            content={"statusCode": 200, "message": "Plan deleted successfully."},
+            status_code=status.HTTP_200_OK,
+        )
+    except LookupError:
+        return JSONResponse(
+            content={"statusCode": 404, "message": "Plan not found."},
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    except Exception:
+        logger.exception("Error in admin_delete_plan")
+        return JSONResponse(
+            content={"error": "Internal server error", "statusCode": 500},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )

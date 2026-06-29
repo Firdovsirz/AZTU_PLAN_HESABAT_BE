@@ -37,9 +37,11 @@ async def submitted_hesabats(
         hesabats = fetched_hesabats.scalars().all()
 
         if not hesabats:
+            # Return the no-content sentinel with HTTP 200 so the JSON body
+            # survives (HTTP 204 carries no body, which the client cannot read).
             return JSONResponse(
                 content={"statusCode": 204, "message": "No content"},
-                status_code=status.HTTP_204_NO_CONTENT
+                status_code=status.HTTP_200_OK
             )
 
         # Collect all unique fin_kods and work_plan_serial_numbers
@@ -94,13 +96,15 @@ async def submitted_hesabats(
             grouped[key]["activity_type_codes"].append(code_int)
             grouped[key]["activity_type_names"].append(activity_map.get(code_int, "Unknown"))
 
+        total_hesabats = len(grouped)
         grouped_list = list(grouped.values())[start:end]
 
         return JSONResponse(
             content={
                 "statusCode": 200,
                 "message": "Submitted hesabats fetched successfully",
-                "hesabats": grouped_list
+                "hesabats": grouped_list,
+                "total_hesabats": total_hesabats
             }
         )
 
@@ -359,41 +363,117 @@ async def submit_hesabat(
 
 # Delete hesabat
 
+# ---------------------------------------------------------------------------
+# Shared apply helpers (mutate the session, NO commit). Reused by the request
+# approval flow and the admin direct-action endpoints. A missing target raises
+# LookupError so the caller can return a 404.
+# ---------------------------------------------------------------------------
+
+# The only hesabat fields editable through the request/direct flow.
+_HESABAT_EDIT_FIELDS = {"result_indicator", "note", "done_percentage"}
+
+
+async def apply_hesabat_edit(db: AsyncSession, serial: str, changes: dict) -> str:
+    """Apply text edits to every hesabat row of a serial. Returns owner fin_kod."""
+    result = await db.execute(
+        select(Hesabat).where(Hesabat.work_plan_serial_number == serial)
+    )
+    rows = result.scalars().all()
+    if not rows:
+        raise LookupError("hesabat_not_found")
+
+    cleaned = {
+        key: value
+        for key, value in (changes or {}).items()
+        if key in _HESABAT_EDIT_FIELDS
+    }
+    for row in rows:
+        for key, value in cleaned.items():
+            setattr(row, key, value)
+    return rows[0].fin_kod
+
+
+async def apply_hesabat_delete(db: AsyncSession, serial: str) -> str:
+    """Delete every hesabat row of a serial. Returns owner fin_kod."""
+    result = await db.execute(
+        select(Hesabat).where(Hesabat.work_plan_serial_number == serial)
+    )
+    rows = result.scalars().all()
+    if not rows:
+        raise LookupError("hesabat_not_found")
+
+    owner = rows[0].fin_kod
+    for row in rows:
+        await db.delete(row)
+    return owner
+
+
 async def delete_hesabat(
     work_plan_serial_number: str,
     db: AsyncSession = Depends(get_db)
 ):
+    """Admin direct delete of a hesabat — removes the rows and notifies the owner."""
+    from app.utils.notify import notify_user
     try:
-        result = await db.execute(
-            select(Hesabat)
-            .where(Hesabat.work_plan_serial_number)
+        owner = await apply_hesabat_delete(db, work_plan_serial_number)
+        await notify_user(
+            db,
+            owner,
+            "Hesabatınız silindi",
+            f"{work_plan_serial_number} nömrəli hesabatınız administrator tərəfindən silindi.",
+            ntype="error",
         )
-
-        hesabat = result.scalar_one_or_none()
-
-        if not hesabat:
-            return JSONResponse(
-                content={
-                    "statusCode": 404,
-                    "message": "Hesabat not found"
-                }, status_code=status.HTTP_404_NOT_FOUND
-            )
-        
-        db.delete(hesabat)
-        await db.commit()
-
         return JSONResponse(
             content={
                 "statusCode": 200,
-                "message": "Hesabat deleted successfully.1"
+                "message": "Hesabat deleted successfully."
             }, status_code=status.HTTP_200_OK
         )
-    
-    except Exception as e:
+
+    except LookupError:
+        return JSONResponse(
+            content={
+                "statusCode": 404,
+                "message": "Hesabat not found"
+            }, status_code=status.HTTP_404_NOT_FOUND
+        )
+    except Exception:
         return JSONResponse(
             content={
                 "error": "Internal server error"
             }, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+async def admin_edit_hesabat(
+    serial: str,
+    changes: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """Admin direct edit of a hesabat's text fields — notifies the owner."""
+    from app.utils.notify import notify_user
+    try:
+        owner = await apply_hesabat_edit(db, serial, changes)
+        await notify_user(
+            db,
+            owner,
+            "Hesabatınız redaktə edildi",
+            f"{serial} nömrəli hesabatınız administrator tərəfindən redaktə edildi.",
+            ntype="info",
+        )
+        return JSONResponse(
+            content={"statusCode": 200, "message": "Hesabat updated successfully."},
+            status_code=status.HTTP_200_OK,
+        )
+    except LookupError:
+        return JSONResponse(
+            content={"statusCode": 404, "message": "Hesabat not found."},
+            status_code=status.HTTP_404_NOT_FOUND,
+        )
+    except Exception:
+        return JSONResponse(
+            content={"error": "Internal server error", "statusCode": 500},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
 # Get a single hesabat by fin kod

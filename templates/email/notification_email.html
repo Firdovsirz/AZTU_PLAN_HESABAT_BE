@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+</head>
+
+<body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+    <div style="max-width: 600px; margin: auto; background-color: #ffffff; padding: 20px; border-radius: 5px;">
+        <div style="display: flex; justify-content: center; align-items: center;">
+            <img style="width: 200px; height:200px;"
+                src="https://imgs.search.brave.com/7JzsZjqAeKhTDxdEbeZ45jrbyhcas_NMleB8sloc5bw/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly93c2Vj/LmVkdS5hei9pbWFn/ZXMvdW5pdmVyc2l0/aWVzL2F6ZXJiYXlj/YW4tdGV4bmlraS11/bml2ZXJzaXRldGkt/bG9xby5qcGc"
+                alt="AzTU">
+        </div>
+        <h2 style="color: #333333;">Salam, {{ name }}!</h2>
+        <h3 style="color: #007BFF;">{{ title }}</h3>
+        <p style="color: #666666;">{{ message }}</p>
+        {% if reason %}
+        <div style="background-color: #f8f9fa; border-left: 4px solid #007BFF; padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
+            <p style="margin: 0; font-size: 13px; color: #888888; text-transform: uppercase; letter-spacing: 0.05em;">Səbəb</p>
+            <p style="margin: 4px 0 0 0; color: #333333;">{{ reason }}</p>
+        </div>
+        {% endif %}
+        <div style="width: 100%; display: flex; justify-content: center; align-items: center;">
+            <button
+                style="background-color: #007BFF; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer;">
+                <a href="http://localhost:5173" style="color: white; text-decoration: none;">
+                    Sistemə daxil ol
+                </a>
+            </button>
+        </div>
+        <hr>
+        <p style="font-size: 12px; color: #aaaaaa;">AZTU Plan Hesabat İnformasiya Sistemi. Bütün hüquqlar qorunur.</p>
+    </div>
+</body>
+
+</html>

@@ -21,6 +21,12 @@ def token_required(allowed_roles=None):
             request.state.user = payload
             return payload
 
+        except HTTPException:
+            # Preserve intentional status codes — notably the 401 that
+            # decode_auth_token raises for an expired/invalid token, so the
+            # client's interceptor can clear the session and redirect to sign-in.
+            # (A bare `except Exception` here would otherwise mask it as 403.)
+            raise
         except IndexError:
             raise HTTPException(status_code=403, detail='Invalid token format.')
         except Exception as e:

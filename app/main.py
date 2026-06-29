@@ -9,8 +9,13 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from sqlalchemy import text
 
 from app.utils.limiter import register_limiter
+from app.db.database import engine, Base
+from app.models.request_model import Request as RequestModel
+from app.models.notification_model import Notification as NotificationModel
+from app.models.feedback_model import YouSaidWeDid as FeedbackModel
 from app.api.v1.routes import (
     auth,
     duty,
@@ -19,9 +24,12 @@ from app.api.v1.routes import (
     faculty,
     cafedra,
     hesabat,
+    request,
     activity,
     assessment,
-    department
+    department,
+    notification,
+    feedback,
 )
 
 # --- Logging ---------------------------------------------------------------
@@ -85,3 +93,38 @@ app.include_router(assessment.router, prefix="/api", tags=["Assessment"])
 app.include_router(plan.router, prefix="/api", tags=["Plan"])
 app.include_router(user.router, prefix="/api", tags=["User"])
 app.include_router(hesabat.router, prefix="/api", tags=["Hesabat"])
+app.include_router(request.router, prefix="/api", tags=["Request"])
+app.include_router(notification.router, prefix="/api", tags=["Notification"])
+app.include_router(feedback.router, prefix="/api", tags=["Feedback"])
+
+
+# --- Schema bootstrap ------------------------------------------------------
+# This project does not run migrations; existing tables were created manually.
+# `requests` and `notifications` are managed by the app, so create them (and
+# only them) idempotently on startup. create_all with checkfirst=True never
+# touches tables that already exist. The `requests` table predates the
+# target/proposed columns, so they are added with ADD COLUMN IF NOT EXISTS.
+@app.on_event("startup")
+async def _ensure_schema() -> None:
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(
+                lambda sync_conn: Base.metadata.create_all(
+                    sync_conn,
+                    tables=[
+                        RequestModel.__table__,
+                        NotificationModel.__table__,
+                        FeedbackModel.__table__,
+                    ],
+                )
+            )
+            for ddl in (
+                "ALTER TABLE requests ADD COLUMN IF NOT EXISTS target_type VARCHAR",
+                "ALTER TABLE requests ADD COLUMN IF NOT EXISTS target_serial VARCHAR",
+                "ALTER TABLE requests ADD COLUMN IF NOT EXISTS proposed_changes TEXT",
+            ):
+                await conn.execute(text(ddl))
+    except Exception as exc:  # pragma: no cover - boot-time best effort
+        logging.getLogger(__name__).warning(
+            "Could not ensure request/notification schema: %s", exc
+        )
