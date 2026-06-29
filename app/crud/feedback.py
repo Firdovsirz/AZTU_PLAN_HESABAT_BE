@@ -13,8 +13,10 @@ from app.api.v1.schemas.feedback_schema import CreateFeedback, UpdateFeedback
 def _serialize(item: YouSaidWeDid) -> dict:
     return {
         "id": item.id,
-        "you_said": item.you_said,
-        "we_did": item.we_did,
+        "you_said_az": item.you_said_az,
+        "you_said_en": item.you_said_en,
+        "we_did_az": item.we_did_az,
+        "we_did_en": item.we_did_en,
         "created_at": item.created_at.isoformat() if item.created_at else None,
         "updated_at": item.updated_at.isoformat() if item.updated_at else None,
     }
@@ -46,19 +48,23 @@ async def create_feedback(
     form_data: CreateFeedback,
     db: AsyncSession = Depends(get_db),
 ):
-    """Admin creates a "you said / we did" entry."""
+    """Admin creates a "you said / we did" entry (both languages required)."""
     try:
-        you_said = (form_data.you_said or "").strip()
-        we_did = (form_data.we_did or "").strip()
-        if not you_said or not we_did:
+        you_said_az = (form_data.you_said_az or "").strip()
+        you_said_en = (form_data.you_said_en or "").strip()
+        we_did_az = (form_data.we_did_az or "").strip()
+        we_did_en = (form_data.we_did_en or "").strip()
+        if not (you_said_az and you_said_en and we_did_az and we_did_en):
             return JSONResponse(
-                content={"statusCode": 400, "message": "Both fields are required."},
+                content={"statusCode": 400, "message": "All fields (AZ and EN) are required."},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         item = YouSaidWeDid(
-            you_said=you_said,
-            we_did=we_did,
+            you_said_az=you_said_az,
+            you_said_en=you_said_en,
+            we_did_az=we_did_az,
+            we_did_en=we_did_en,
             created_at=datetime.utcnow(),
         )
         db.add(item)
@@ -95,23 +101,17 @@ async def update_feedback(
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        if form_data.you_said is not None:
-            you_said = form_data.you_said.strip()
-            if not you_said:
-                return JSONResponse(
-                    content={"statusCode": 400, "message": "Field cannot be empty."},
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
-            item.you_said = you_said
-
-        if form_data.we_did is not None:
-            we_did = form_data.we_did.strip()
-            if not we_did:
-                return JSONResponse(
-                    content={"statusCode": 400, "message": "Field cannot be empty."},
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                )
-            item.we_did = we_did
+        fields = ("you_said_az", "you_said_en", "we_did_az", "we_did_en")
+        for field in fields:
+            value = getattr(form_data, field)
+            if value is not None:
+                cleaned = value.strip()
+                if not cleaned:
+                    return JSONResponse(
+                        content={"statusCode": 400, "message": "Field cannot be empty."},
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                    )
+                setattr(item, field, cleaned)
 
         item.updated_at = datetime.utcnow()
         await db.commit()

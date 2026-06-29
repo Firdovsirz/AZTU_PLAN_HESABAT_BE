@@ -122,6 +122,10 @@ async def _ensure_schema() -> None:
                 "ALTER TABLE requests ADD COLUMN IF NOT EXISTS target_type VARCHAR",
                 "ALTER TABLE requests ADD COLUMN IF NOT EXISTS target_serial VARCHAR",
                 "ALTER TABLE requests ADD COLUMN IF NOT EXISTS proposed_changes TEXT",
+                "ALTER TABLE you_said_we_did ADD COLUMN IF NOT EXISTS you_said_az TEXT",
+                "ALTER TABLE you_said_we_did ADD COLUMN IF NOT EXISTS you_said_en TEXT",
+                "ALTER TABLE you_said_we_did ADD COLUMN IF NOT EXISTS we_did_az TEXT",
+                "ALTER TABLE you_said_we_did ADD COLUMN IF NOT EXISTS we_did_en TEXT",
             ):
                 await conn.execute(text(ddl))
     except Exception as exc:  # pragma: no cover - boot-time best effort

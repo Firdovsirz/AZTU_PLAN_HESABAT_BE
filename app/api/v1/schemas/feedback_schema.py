@@ -3,10 +3,14 @@ from pydantic import BaseModel
 
 
 class CreateFeedback(BaseModel):
-    you_said: str
-    we_did: str
+    you_said_az: str
+    you_said_en: str
+    we_did_az: str
+    we_did_en: str
 
 
 class UpdateFeedback(BaseModel):
-    you_said: Optional[str] = None
-    we_did: Optional[str] = None
+    you_said_az: Optional[str] = None
+    you_said_en: Optional[str] = None
+    we_did_az: Optional[str] = None
+    we_did_en: Optional[str] = None
