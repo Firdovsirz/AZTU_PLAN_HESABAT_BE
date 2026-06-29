@@ -7,12 +7,22 @@ from app.db.session import get_db
 from app.utils.limiter import limiter
 from app.utils.jwt_required import token_required
 from app.api.v1.schemas.comment_schema import CreateComment
-from app.crud.comment import create_comment, get_comments, delete_comment
+from app.crud.comment import create_comment, get_comments, get_my_comments, delete_comment
 
 router = APIRouter()
 
 _ADMIN_ROLES = [0, 1]
 _ALL_ROLES = [0, 1, 2, 3, 4]
+
+
+@router.get("/my-comments")
+@limiter.limit("300/minute")
+async def my_comments_endpoint(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(token_required(_ALL_ROLES)),
+):
+    return await get_my_comments(current_user, db)
 
 
 @router.post("/comments")

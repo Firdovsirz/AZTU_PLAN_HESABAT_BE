@@ -181,6 +181,41 @@ async def get_comments(
         )
 
 
+async def get_my_comments(
+    current_user: dict,
+    db: AsyncSession = Depends(get_db),
+):
+    """All comments addressed to the current user (any target), newest first."""
+    try:
+        fin_kod = current_user.get("fin_kod") if current_user else None
+        if not fin_kod:
+            return JSONResponse(
+                content={"statusCode": 401, "message": "Unauthorized."},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        fetched = await db.execute(
+            select(Comment)
+            .where(Comment.owner_fin_kod == fin_kod)
+            .order_by(Comment.created_at.desc())
+        )
+        comments = fetched.scalars().all()
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Comments fetched successfully.",
+                "comments": [_serialize(c) for c in comments],
+            },
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception:
+        logger.exception("comment operation failed")
+        return JSONResponse(
+            content={"error": "Internal server error", "statusCode": 500},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
 async def delete_comment(
     comment_id: int,
     db: AsyncSession = Depends(get_db),
