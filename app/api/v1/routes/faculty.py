@@ -69,3 +69,13 @@ async def get_fac_name_endpoint(
     # _current_user=Depends(token_required([0, 1, 2, 3, 4]))
 ):
     return await get_fac_name(faculty_code, db)
+
+@router.get("/faculty/{faculty_code}/plans-hesabats")
+@limiter.limit("500/minute")
+async def faculty_plans_hesabats_endpoint(
+    request: Request,
+    faculty_code: Annotated[str, Path(..., description="Faculty Code")],
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([1]))
+):
+    return await faculty_plans_hesabats(faculty_code, db)

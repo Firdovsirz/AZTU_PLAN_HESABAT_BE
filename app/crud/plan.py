@@ -16,10 +16,25 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-async def generate_plan_serial_number():
+async def generate_plan_serial_number(db: AsyncSession = None):
+    """Generate a unique work_plan_serial_number.
+
+    The serial is a random 6-digit value scoped to the year; with a DB session
+    we retry on collision so two different users never share a serial (the serial
+    is used as the lookup/ownership key in plan, hesabat, request and comment
+    flows). Without a session it falls back to a single random value.
+    """
     year = datetime.now().year
-    random_digits = f"{random.randint(0, 999999):06d}"
-    return f"PLAN-{year}-{random_digits}"
+    for _ in range(10):
+        candidate = f"PLAN-{year}-{random.randint(0, 999999):06d}"
+        if db is None:
+            return candidate
+        existing = await db.execute(
+            select(Plan.id).where(Plan.work_plan_serial_number == candidate).limit(1)
+        )
+        if existing.scalar_one_or_none() is None:
+            return candidate
+    return candidate
 
 async def all_plans(
     db: AsyncSession = Depends(get_db),
@@ -158,7 +173,7 @@ async def create_plan(
         last_plan = fetched_last_plan.scalar_one_or_none()
         next_work_row_number = 1 if not last_plan else last_plan.work_row_number + 1
 
-        generated_serial_number = await generate_plan_serial_number()
+        generated_serial_number = await generate_plan_serial_number(db)
 
         for idx, code in enumerate(activity_type_codes):
             plan = Plan(

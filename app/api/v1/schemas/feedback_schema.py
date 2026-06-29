@@ -7,6 +7,8 @@ class CreateFeedback(BaseModel):
     you_said_en: str
     we_did_az: str
     we_did_en: str
+    # "in_progress" | "done"; defaults to "done" when omitted.
+    status: Optional[str] = None
 
 
 class UpdateFeedback(BaseModel):
@@ -14,3 +16,4 @@ class UpdateFeedback(BaseModel):
     you_said_en: Optional[str] = None
     we_did_az: Optional[str] = None
     we_did_en: Optional[str] = None
+    status: Optional[str] = None

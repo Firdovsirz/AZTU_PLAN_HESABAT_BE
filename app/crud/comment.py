@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from fastapi import Depends, status
@@ -11,6 +12,8 @@ from app.models.plan_model import Plan
 from app.models.hesabat_model import Hesabat
 from app.models.comment_model import Comment
 from app.api.v1.schemas.comment_schema import CreateComment
+
+logger = logging.getLogger(__name__)
 
 _ALLOWED_TARGETS = {"plan", "hesabat", "user"}
 _ADMIN_ROLES = {0, 1}
@@ -84,7 +87,7 @@ async def create_comment(
             )
 
         owner = await _resolve_owner(db, target_type, target_ref)
-        if not owner:
+        if owner is None:
             return JSONResponse(
                 content={"statusCode": 404, "message": "Comment target not found."},
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -112,6 +115,7 @@ async def create_comment(
             status_code=status.HTTP_201_CREATED,
         )
     except Exception:
+        logger.exception("comment operation failed")
         return JSONResponse(
             content={"error": "Internal server error", "statusCode": 500},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -134,19 +138,24 @@ async def get_comments(
             )
 
         owner = await _resolve_owner(db, target_type, target_ref)
-        if not owner:
-            return JSONResponse(
-                content={"statusCode": 404, "message": "Comment target not found."},
-                status_code=status.HTTP_404_NOT_FOUND,
-            )
 
         role = current_user.get("role") if current_user else None
         fin_kod = current_user.get("fin_kod") if current_user else None
-        # Non-admins may only read comments addressed to themselves.
-        if role not in _ADMIN_ROLES and fin_kod != owner:
+        is_admin = role in _ADMIN_ROLES
+
+        # Authorize before revealing existence: a non-admin may only read
+        # comments addressed to themselves, and gets the SAME 403 whether the
+        # target is missing or simply not theirs — so the endpoint cannot be
+        # used to enumerate FIN codes / plan serials.
+        if not is_admin and (owner is None or fin_kod != owner):
             return JSONResponse(
                 content={"statusCode": 403, "message": "Access denied."},
                 status_code=status.HTTP_403_FORBIDDEN,
+            )
+        if owner is None:
+            return JSONResponse(
+                content={"statusCode": 404, "message": "Comment target not found."},
+                status_code=status.HTTP_404_NOT_FOUND,
             )
 
         fetched = await db.execute(
@@ -165,6 +174,7 @@ async def get_comments(
             status_code=status.HTTP_200_OK,
         )
     except Exception:
+        logger.exception("comment operation failed")
         return JSONResponse(
             content={"error": "Internal server error", "statusCode": 500},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -191,6 +201,7 @@ async def delete_comment(
             status_code=status.HTTP_200_OK,
         )
     except Exception:
+        logger.exception("comment operation failed")
         return JSONResponse(
             content={"error": "Internal server error", "statusCode": 500},
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

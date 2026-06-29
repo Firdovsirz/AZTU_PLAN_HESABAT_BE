@@ -9,6 +9,8 @@ from app.db.session import get_db
 from app.models.feedback_model import YouSaidWeDid
 from app.api.v1.schemas.feedback_schema import CreateFeedback, UpdateFeedback
 
+_ALLOWED_STATUSES = {"in_progress", "done"}
+
 
 def _serialize(item: YouSaidWeDid) -> dict:
     return {
@@ -17,6 +19,7 @@ def _serialize(item: YouSaidWeDid) -> dict:
         "you_said_en": item.you_said_en,
         "we_did_az": item.we_did_az,
         "we_did_en": item.we_did_en,
+        "status": item.status or "done",
         "created_at": item.created_at.isoformat() if item.created_at else None,
         "updated_at": item.updated_at.isoformat() if item.updated_at else None,
     }
@@ -60,11 +63,16 @@ async def create_feedback(
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
+        status_val = (form_data.status or "done").strip().lower()
+        if status_val not in _ALLOWED_STATUSES:
+            status_val = "done"
+
         item = YouSaidWeDid(
             you_said_az=you_said_az,
             you_said_en=you_said_en,
             we_did_az=we_did_az,
             we_did_en=we_did_en,
+            status=status_val,
             created_at=datetime.utcnow(),
         )
         db.add(item)
@@ -112,6 +120,15 @@ async def update_feedback(
                         status_code=status.HTTP_400_BAD_REQUEST,
                     )
                 setattr(item, field, cleaned)
+
+        if form_data.status is not None:
+            status_val = form_data.status.strip().lower()
+            if status_val not in _ALLOWED_STATUSES:
+                return JSONResponse(
+                    content={"statusCode": 400, "message": "Invalid status."},
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+            item.status = status_val
 
         item.updated_at = datetime.utcnow()
         await db.commit()

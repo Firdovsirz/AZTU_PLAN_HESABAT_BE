@@ -141,6 +141,7 @@ async def _ensure_schema() -> None:
                 "ALTER TABLE you_said_we_did ADD COLUMN IF NOT EXISTS you_said_en TEXT",
                 "ALTER TABLE you_said_we_did ADD COLUMN IF NOT EXISTS we_did_az TEXT",
                 "ALTER TABLE you_said_we_did ADD COLUMN IF NOT EXISTS we_did_en TEXT",
+                "ALTER TABLE you_said_we_did ADD COLUMN IF NOT EXISTS status VARCHAR NOT NULL DEFAULT 'done'",
                 # Backfill the bilingual columns from the original single-language
                 # columns (only if that 2-column version of the table exists —
                 # guarded so it is a no-op on a fresh DB), then drop the obsolete

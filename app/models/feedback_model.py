@@ -1,5 +1,5 @@
 from app.db.database import Base
-from sqlalchemy import Column, Integer, Text, DateTime
+from sqlalchemy import Column, Integer, String, Text, DateTime
 
 
 class YouSaidWeDid(Base):
@@ -18,5 +18,7 @@ class YouSaidWeDid(Base):
     you_said_en = Column(Text, nullable=False)
     we_did_az = Column(Text, nullable=False)
     we_did_en = Column(Text, nullable=False)
+    # "in_progress" | "done" — whether the "we did" action is still ongoing.
+    status = Column(String, nullable=False, default="done")
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=True)
