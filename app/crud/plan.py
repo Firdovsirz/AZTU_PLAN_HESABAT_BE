@@ -143,13 +143,18 @@ async def all_plans(
         )
 
 async def structure_plan_counts(db: AsyncSession = Depends(get_db)):
-    """Number of plan/report entries per structure (cafedra, department, faculty).
+    """Per-structure counts of plan/report entries AND registered users.
 
     A plan/report entry is one distinct (fin_kod, work_plan_serial_number) pair.
     Membership mirrors the structure views: cafedra = users with that
     cafedra_code, department = users with that department_code, faculty = users
     with that faculty_code who are NOT in any cafedra/department (dekanat level).
-    Returned as {"cafedra": {code: n}, "department": {code: n}, "faculty": {code: n}}.
+
+    Returns:
+      {
+        "plans": {"cafedra": {code: n}, "department": {...}, "faculty": {...}},
+        "users": {"cafedra": {code: n}, "department": {...}, "faculty": {...}}
+      }
     """
     try:
         # Distinct plan entries per user (a serial spans multiple activity rows).
@@ -169,27 +174,33 @@ async def structure_plan_counts(db: AsyncSession = Depends(get_db)):
             )
         )
 
-        cafedra: dict = {}
-        department: dict = {}
-        faculty: dict = {}
+        plans = {"cafedra": {}, "department": {}, "faculty": {}}
+        users = {"cafedra": {}, "department": {}, "faculty": {}}
+
+        def _add(bucket: dict, key: str, amount: int):
+            bucket[key] = bucket.get(key, 0) + amount
+
         for fin_kod, fac_code, caf_code, dep_code in users_result.all():
             n = per_user.get(fin_kod, 0)
-            if not n:
-                continue
             if caf_code:
-                cafedra[caf_code] = cafedra.get(caf_code, 0) + n
+                _add(users["cafedra"], caf_code, 1)
+                if n:
+                    _add(plans["cafedra"], caf_code, n)
             if dep_code:
-                department[dep_code] = department.get(dep_code, 0) + n
+                _add(users["department"], dep_code, 1)
+                if n:
+                    _add(plans["department"], dep_code, n)
             if fac_code and not caf_code and not dep_code:
-                faculty[fac_code] = faculty.get(fac_code, 0) + n
+                _add(users["faculty"], fac_code, 1)
+                if n:
+                    _add(plans["faculty"], fac_code, n)
 
         return JSONResponse(
             content={
                 "statusCode": 200,
-                "message": "Structure plan counts fetched.",
-                "cafedra": cafedra,
-                "department": department,
-                "faculty": faculty,
+                "message": "Structure counts fetched.",
+                "plans": plans,
+                "users": users,
             },
             status_code=status.HTTP_200_OK,
         )
