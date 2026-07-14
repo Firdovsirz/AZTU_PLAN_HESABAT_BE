@@ -11,6 +11,16 @@ from app.api.v1.schemas.request_schema import AdminEditTarget
 
 router = APIRouter()
 
+@router.get("/structure-plan-counts")
+@limiter.limit("500/minute")
+async def structure_plan_counts_endpoint(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _current_user=Depends(token_required([0, 1]))
+):
+    return await structure_plan_counts(db)
+
+
 @router.get("/plans/{start}/{end}")
 @limiter.limit("500/second")
 async def all_plans_endpoint(

@@ -142,6 +142,65 @@ async def all_plans(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
+async def structure_plan_counts(db: AsyncSession = Depends(get_db)):
+    """Number of plan/report entries per structure (cafedra, department, faculty).
+
+    A plan/report entry is one distinct (fin_kod, work_plan_serial_number) pair.
+    Membership mirrors the structure views: cafedra = users with that
+    cafedra_code, department = users with that department_code, faculty = users
+    with that faculty_code who are NOT in any cafedra/department (dekanat level).
+    Returned as {"cafedra": {code: n}, "department": {code: n}, "faculty": {code: n}}.
+    """
+    try:
+        # Distinct plan entries per user (a serial spans multiple activity rows).
+        entries_result = await db.execute(
+            select(Plan.fin_kod, Plan.work_plan_serial_number).distinct()
+        )
+        per_user = {}
+        for fin_kod, _serial in entries_result.all():
+            per_user[fin_kod] = per_user.get(fin_kod, 0) + 1
+
+        users_result = await db.execute(
+            select(
+                User.fin_kod,
+                User.faculty_code,
+                User.cafedra_code,
+                User.department_code,
+            )
+        )
+
+        cafedra: dict = {}
+        department: dict = {}
+        faculty: dict = {}
+        for fin_kod, fac_code, caf_code, dep_code in users_result.all():
+            n = per_user.get(fin_kod, 0)
+            if not n:
+                continue
+            if caf_code:
+                cafedra[caf_code] = cafedra.get(caf_code, 0) + n
+            if dep_code:
+                department[dep_code] = department.get(dep_code, 0) + n
+            if fac_code and not caf_code and not dep_code:
+                faculty[fac_code] = faculty.get(fac_code, 0) + n
+
+        return JSONResponse(
+            content={
+                "statusCode": 200,
+                "message": "Structure plan counts fetched.",
+                "cafedra": cafedra,
+                "department": department,
+                "faculty": faculty,
+            },
+            status_code=status.HTTP_200_OK,
+        )
+    except Exception:
+        logger.exception("Error computing structure plan counts")
+        return JSONResponse(
+            content={"error": "Internal server error", "statusCode": 500},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+
 async def create_plan(
         form_data: CreatePlan = Depends(CreatePlan.as_form),
         db: AsyncSession = Depends(get_db)
