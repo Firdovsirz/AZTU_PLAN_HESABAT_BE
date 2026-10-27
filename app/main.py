@@ -32,6 +32,7 @@ from app.api.v1.routes import (
     notification,
     feedback,
     comment,
+    export,
 )
 
 # --- Logging ---------------------------------------------------------------
@@ -94,6 +95,8 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-API-KEY"],
+    # Lets the browser read the server-chosen file name of export downloads.
+    expose_headers=["Content-Disposition"],
 )
 
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
@@ -110,6 +113,7 @@ app.include_router(request.router, prefix="/api", tags=["Request"])
 app.include_router(notification.router, prefix="/api", tags=["Notification"])
 app.include_router(feedback.router, prefix="/api", tags=["Feedback"])
 app.include_router(comment.router, prefix="/api", tags=["Comment"])
+app.include_router(export.router, prefix="/api", tags=["Export"])
 
 
 # --- Schema bootstrap ------------------------------------------------------
